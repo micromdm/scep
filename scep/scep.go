@@ -4,12 +4,14 @@
 package scep
 
 import (
+	"bytes"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
 
-	"github.com/groob/pkcs7"
+	"github.com/micromdm/scep/pkcs7"
 )
 
 // errors
@@ -93,8 +95,8 @@ type PKIMessage struct {
 	*CertRepMessage
 	*CSRReqMessage
 
-	// the original, unparsed message
-	raw []byte
+	// DER Encoded PKIMessage
+	Raw []byte
 
 	// parsed
 	p7 *pkcs7.PKCS7
@@ -107,6 +109,11 @@ type PKIMessage struct {
 type CertRepMessage struct {
 	PKIStatus
 	RecipientNonce
+	FailInfo
+
+	Certificate *x509.Certificate
+
+	degenerate []byte
 }
 
 // CSRReqMessage can be of the type PKCSReq/RenewalReq/UpdateReq
@@ -115,7 +122,8 @@ type CertRepMessage struct {
 // by the recipient public key(example CA)
 type CSRReqMessage struct {
 	// PKCS#10 Certificate request inside the envelope
-	CSR *x509.CertificateRequest
+	CSR        *x509.CertificateRequest
+	degenerate []byte
 }
 
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
@@ -127,29 +135,24 @@ func ParsePKIMessage(data []byte) (*PKIMessage, error) {
 	}
 
 	var tID TransactionID
-	err = p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID)
-	if err != nil {
+	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
 		return nil, err
 	}
 
 	var msgType MessageType
-	err = p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType)
-	if err != nil {
-		return nil, err
-	}
-
-	var sn SenderNonce
-	err = p7.UnmarshalSignedAttribute(oidSCEPsenderNonce, &sn)
-	if err != nil {
+	if err := p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType); err != nil {
 		return nil, err
 	}
 
 	msg := &PKIMessage{
 		TransactionID: tID,
 		MessageType:   msgType,
-		SenderNonce:   sn,
-		raw:           data,
+		Raw:           data,
 		p7:            p7,
+	}
+
+	if err := msg.parseMessageType(); err != nil {
+		return nil, err
 	}
 
 	return msg, nil
@@ -158,8 +161,49 @@ func ParsePKIMessage(data []byte) (*PKIMessage, error) {
 func (msg *PKIMessage) parseMessageType() error {
 	switch msg.MessageType {
 	case CertRep:
-		return errNotImplemented
+		var status PKIStatus
+		if err := msg.p7.UnmarshalSignedAttribute(oidSCEPpkiStatus, &status); err != nil {
+			return err
+		}
+		var rn RecipientNonce
+		if err := msg.p7.UnmarshalSignedAttribute(oidSCEPrecipientNonce, &rn); err != nil {
+			return err
+		}
+		if len(rn) == 0 {
+			return errors.New("scep pkiMessage must include recipientNonce attribute")
+		}
+		cr := &CertRepMessage{
+			PKIStatus:      status,
+			RecipientNonce: rn,
+		}
+		switch status {
+		case SUCCESS:
+			break
+		case FAILURE:
+			var fi FailInfo
+			if err := msg.p7.UnmarshalSignedAttribute(oidSCEPfailInfo, &fi); err != nil {
+				return err
+			}
+			if fi == "" {
+				return errors.New("scep pkiStatus FAILURE must have a failInfo attribute")
+			}
+			cr.FailInfo = fi
+		case PENDING:
+			return errNotImplemented
+		default:
+			return errors.New("unknown scep pkiStatus")
+		}
+		msg.CertRepMessage = cr
+		return nil
 	case PKCSReq, UpdateReq, RenewalReq:
+		var sn SenderNonce
+		if err := msg.p7.UnmarshalSignedAttribute(oidSCEPsenderNonce, &sn); err != nil {
+			return err
+		}
+		if len(sn) == 0 {
+			return errors.New("scep pkiMessage must include senderNonce attribute")
+		}
+		msg.SenderNonce = sn
 		return nil
 	case GetCRL, GetCert, CertPoll:
 		return errNotImplemented
@@ -196,4 +240,107 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	default:
 		return errUnknownMessageType
 	}
+}
+
+// SignCSR creates an x509.Certificate based on a template and Cert Authority credentials
+// returns a new PKIMessage with CertRep data
+func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
+	// check if CSRReqMessage has already been decrypted
+	if msg.CSRReqMessage.CSR == nil {
+		if err := msg.DecryptPKIEnvelope(crtAuth, keyAuth); err != nil {
+			return nil, err
+		}
+	}
+	// sign the CSR creating a DER encoded cert
+	crtBytes, err := x509.CreateCertificate(rand.Reader, template, crtAuth, msg.CSRReqMessage.CSR.PublicKey, keyAuth)
+	if err != nil {
+		return nil, err
+	}
+	// parse the certificate
+	crt, err := x509.ParseCertificate(crtBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// create a degenerate cert structure
+	deg, err := DegenerateCertificates([]*x509.Certificate{crt})
+	if err != nil {
+		return nil, err
+	}
+
+	// encrypt degenerate data using the original messages recipients
+	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates)
+	if err != nil {
+		return nil, err
+	}
+
+	// PKIMessageAttributes to be signed
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			pkcs7.Attribute{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPpkiStatus,
+				Value: SUCCESS,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPmessageType,
+				Value: CertRep,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	signedData, err := pkcs7.NewSignedData(e7)
+	if err != nil {
+		return nil, err
+	}
+	// add the certificate into the signed data type
+	// this cert must be added before the signedData because the recipient will expect it
+	// as the first certificate in the array
+	signedData.AddCertificate(crt)
+	// sign the attributes
+	if err := signedData.AddSigner(crtAuth, keyAuth, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := signedData.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      SUCCESS,
+		RecipientNonce: RecipientNonce(msg.SenderNonce),
+		Certificate:    crt,
+		degenerate:     deg,
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
+}
+
+// DegenerateCertificates creates degenerate certificates pkcs#7 type
+func DegenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
+	var buf bytes.Buffer
+	for _, cert := range certs {
+		buf.Write(cert.Raw)
+	}
+	degenerate, err := pkcs7.DegenerateCertificate(buf.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	return degenerate, nil
 }
