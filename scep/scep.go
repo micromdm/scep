@@ -15,7 +15,7 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/micromdm/scep/pkcs7"
+	"github.com/micromdm/scep/scep/internal/pkcs7"
 )
 
 // errors
