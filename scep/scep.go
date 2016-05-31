@@ -5,11 +5,15 @@ package scep
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/x509"
 	"encoding/asn1"
+	"encoding/base64"
 	"errors"
+	"math/big"
 
 	"github.com/micromdm/scep/pkcs7"
 )
@@ -103,6 +107,14 @@ type PKIMessage struct {
 
 	// decrypted enveloped content
 	pkiEnvelope []byte
+
+	// Used to sign message
+	Recipients []*x509.Certificate
+
+	// Signer info
+
+	SignerKey  *rsa.PrivateKey
+	SignerCert *x509.Certificate
 }
 
 // CertRepMessage is a type of PKIMessage
@@ -122,8 +134,7 @@ type CertRepMessage struct {
 // by the recipient public key(example CA)
 type CSRReqMessage struct {
 	// PKCS#10 Certificate request inside the envelope
-	CSR        *x509.CertificateRequest
-	degenerate []byte
+	CSR *x509.CertificateRequest
 }
 
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
@@ -343,4 +354,120 @@ func DegenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
 		return nil, err
 	}
 	return degenerate, nil
+}
+
+// NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
+func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage, error) {
+	e7, err := pkcs7.Encrypt(csr.Raw, tmpl.Recipients)
+	if err != nil {
+		return nil, err
+	}
+
+	signedData, err := pkcs7.NewSignedData(e7)
+	if err != nil {
+		return nil, err
+	}
+
+	// create transaction ID from public key hash
+	tID, err := newTransactionID(csr.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	sn, err := newNonce()
+	if err != nil {
+		return nil, err
+	}
+
+	// PKIMessageAttributes to be signed
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			pkcs7.Attribute{
+				Type:  oidSCEPtransactionID,
+				Value: tID,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPmessageType,
+				Value: tmpl.MessageType,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPsenderNonce,
+				Value: sn,
+			},
+		},
+	}
+
+	// sign attributes
+	if err := signedData.AddSigner(tmpl.SignerCert, tmpl.SignerKey, config); err != nil {
+		return nil, err
+	}
+
+	rawPKIMessage, err := signedData.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CSRReqMessage{
+		CSR: csr,
+	}
+
+	newMsg := &PKIMessage{
+		Raw:           rawPKIMessage,
+		MessageType:   tmpl.MessageType,
+		TransactionID: tID,
+		SenderNonce:   sn,
+		CSRReqMessage: cr,
+	}
+
+	return newMsg, nil
+}
+
+func newNonce() (SenderNonce, error) {
+	size := 16
+	b := make([]byte, size)
+	_, err := rand.Read(b)
+	if err != nil {
+		return SenderNonce{}, err
+	}
+	return SenderNonce(b), nil
+}
+
+// use public key to create a deterministric transactionID
+func newTransactionID(key crypto.PublicKey) (TransactionID, error) {
+	id, err := GenerateSubjectKeyID(key)
+	if err != nil {
+		return "", err
+	}
+
+	encHash := base64.StdEncoding.EncodeToString(id)
+	return TransactionID(encHash), nil
+}
+
+// rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.
+type rsaPublicKey struct {
+	N *big.Int
+	E int
+}
+
+// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
+// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
+func GenerateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	var pubBytes []byte
+	var err error
+	switch pub := pub.(type) {
+	case *rsa.PublicKey:
+		pubBytes, err = asn1.Marshal(rsaPublicKey{
+			N: pub.N,
+			E: pub.E,
+		})
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("only RSA public key is supported")
+	}
+
+	hash := sha1.Sum(pubBytes)
+
+	return hash[:], nil
 }

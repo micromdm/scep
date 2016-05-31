@@ -2,9 +2,11 @@ package scep_test
 
 import (
 	"crypto"
+	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
@@ -92,6 +94,64 @@ func TestSignCSR(t *testing.T) {
 		t.Fatal(err)
 	}
 	testParsePKIMessage(t, certRep.Raw)
+}
+
+func TestNewCSRRequest(t *testing.T) {
+	key, err := newRSAKey(2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	derBytes, err := newCSR(key, "john.doe@example.com", "US", "com.apple.scep.2379B935-294B-4AF1-A213-9BD44A2C6688")
+	if err != nil {
+		t.Fatal(err)
+	}
+	csr, err := x509.ParseCertificateRequest(derBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clientcert, clientkey := loadClientCredentials(t)
+	cacert, cakey := loadCACredentials(t)
+	tmpl := &scep.PKIMessage{
+		MessageType: scep.PKCSReq,
+		Recipients:  []*x509.Certificate{cacert},
+		SignerCert:  clientcert,
+		SignerKey:   clientkey,
+	}
+
+	pkcsreq, err := scep.NewCSRRequest(csr, tmpl)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := testParsePKIMessage(t, pkcsreq.Raw)
+	err = msg.DecryptPKIEnvelope(cacert, cakey)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// create a new RSA private key
+func newRSAKey(bits int) (*rsa.PrivateKey, error) {
+	private, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return nil, err
+	}
+	return private, nil
+}
+
+// create a CSR using the same parameters as Keychain Access would produce
+func newCSR(priv *rsa.PrivateKey, email, country, cname string) ([]byte, error) {
+	subj := pkix.Name{
+		Country:    []string{country},
+		CommonName: cname,
+		ExtraNames: []pkix.AttributeTypeAndValue{pkix.AttributeTypeAndValue{
+			Type:  []int{1, 2, 840, 113549, 1, 9, 1},
+			Value: email,
+		}},
+	}
+	template := &x509.CertificateRequest{
+		Subject: subj,
+	}
+	return x509.CreateCertificateRequest(rand.Reader, template, priv)
 }
 
 func loadTestFile(t *testing.T, path string) []byte {
