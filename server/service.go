@@ -18,7 +18,7 @@ type Service interface {
 
 	// PKIOperation handles incoming SCEP messages such as PKCSReq and
 	// sends back a CertRep PKIMessag.
-	PKIOperation(ctx context.Context, msg *scep.PKIMessage) (*scep.PKIMessage, error)
+	PKIOperation(ctx context.Context, msg []byte) (*scep.PKIMessage, error)
 
 	// GetNextCACert returns a replacement certificate or certificate chain
 	// when the old one expires. The response format is a PKCS#7 Degenerate
@@ -38,7 +38,7 @@ func (svc service) GetCACert(ctx context.Context) ([]byte, error) {
 	panic("not implemented")
 }
 
-func (svc service) PKIOperation(ctx context.Context, msg *scep.PKIMessage) (*scep.PKIMessage, error) {
+func (svc service) PKIOperation(ctx context.Context, msg []byte) (*scep.PKIMessage, error) {
 	panic("not implemented")
 }
 
