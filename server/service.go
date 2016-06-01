@@ -2,7 +2,7 @@ package scepserver
 
 import "github.com/micromdm/scep/scep"
 
-// Service is the interface for all supported SCEP server operations
+// Service is the interface for all supported SCEP server operations.
 type Service interface {
 	// GetCACaps returns a list of options
 	// which are supported by the server.
