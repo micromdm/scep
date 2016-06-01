@@ -44,3 +44,8 @@ func (svc service) PKIOperation(ctx context.Context, msg *scep.PKIMessage) (*sce
 func (svc service) GetNextCACert(ctx context.Context) ([]byte, error) {
 	panic("not implemented")
 }
+
+// NewService creates a new scep service
+func NewService() Service {
+	return &service{}
+}
