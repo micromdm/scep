@@ -9,7 +9,6 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
-	"github.com/micromdm/scep/scep"
 	"golang.org/x/net/context"
 )
 
@@ -17,6 +16,7 @@ import (
 func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http.Handler {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(logger),
+		kithttp.ServerBefore(updateContext),
 	}
 
 	scepHandler := kithttp.NewServer(
@@ -32,34 +32,24 @@ func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http
 	return mux
 }
 
+func updateContext(ctx context.Context, r *http.Request) context.Context {
+	q := r.URL.Query()
+	if _, ok := q["operation"]; ok {
+		ctx = context.WithValue(ctx, "operation", q.Get("operation"))
+	}
+	return ctx
+}
+
 // DecodeSCEPRequest decodes an HTTP request to the SCEP server
 // extracting the Operation and Message.
-func decodeSCEPRequest(_ context.Context, r *http.Request) (interface{}, error) {
-	q := r.URL.Query()
-	var requestErr error // an error that should be encoded in the response
-	if _, ok := q["operation"]; !ok {
-		requestErr = errors.New("bad request")
-		return SCEPRequest{Err: requestErr}, nil
-	}
-
+func decodeSCEPRequest(ctx context.Context, r *http.Request) (interface{}, error) {
 	msg, err := message(r)
 	if err != nil {
 		return nil, err
 	}
 
-	var pkiMessage *scep.PKIMessage
-	if len(msg) > 0 {
-		p, err := scep.ParsePKIMessage(msg)
-		if err != nil { // should this be a requestErr?
-			return nil, err
-		}
-		pkiMessage = p
-	}
-
 	request := SCEPRequest{
-		Operation:  q.Get("operation"),
-		Message:    msg,
-		PKIMessage: pkiMessage,
+		Message: msg,
 	}
 
 	return request, nil
@@ -83,33 +73,60 @@ func message(r *http.Request) ([]byte, error) {
 }
 
 // EncodeSCEPResponse writes a SCEP response back to the SCEP client.
-func encodeSCEPResponse(_ context.Context, w http.ResponseWriter, response interface{}) error {
+func encodeSCEPResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
 	resp := response.(SCEPResponse)
 	if resp.Err != nil {
 		fmt.Println(resp.Err)
+		return resp.Err
 	}
-	if len(resp.Data) > 0 { //use data field
-		w.Write(resp.Data)
-		return nil
-	}
-	if resp.PKIMessage != nil {
-		w.Write(resp.PKIMessage.Raw)
-		return nil
-	}
+	w.Header().Set("Content-Type", contentHeader(ctx))
+	w.Write(resp.Data)
 	return nil
+}
+
+const (
+	certChainHeader = "application/x-x509-ca-ra-cert"
+	pkiOpHeader     = "application/x-pki-message"
+)
+
+func contentHeader(ctx context.Context) string {
+	op := ctx.Value("operation")
+	switch op {
+	case "GetCACert":
+		return certChainHeader
+	case "PKIOperation":
+		return pkiOpHeader
+	default:
+		return "text/plain"
+	}
 }
 
 func makeSCEPEndpoint(svc Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		op := ctx.Value("operation")
+		if op == nil {
+			return SCEPResponse{Err: errors.New("unknown operation")}, nil
+		}
 		req := request.(SCEPRequest)
-
-		switch req.Operation {
+		switch op {
 		case "GetCACaps":
 			caps, err := svc.GetCACaps(ctx)
 			if err != nil {
 				return SCEPResponse{Err: err}, nil
 			}
 			return SCEPResponse{Data: caps}, nil
+		case "GetCACert":
+			cert, err := svc.GetCACert(ctx)
+			if err != nil {
+				return SCEPResponse{Err: err}, nil
+			}
+			return SCEPResponse{Data: cert}, nil
+		case "PKIOperation":
+			resp, err := svc.PKIOperation(ctx, req.Message)
+			if err != nil {
+				return SCEPResponse{Err: err}, nil
+			}
+			return SCEPResponse{Data: resp}, nil
 		default:
 			return nil, errors.New("not implemented")
 		}

@@ -7,11 +7,9 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -28,12 +26,28 @@ func TestCACaps(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	io.Copy(os.Stdout, resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		t.Error("expected", http.StatusOK, "got", resp.StatusCode)
+	}
 
 }
 
 func newServer(t *testing.T) (*httptest.Server, scepserver.Service) {
-	svc := scepserver.NewService()
+	var err error
+	var depot scepserver.Depot // cert storage
+	{
+		depot, err = scepserver.NewFileDepot("../scep/testdata/testca")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	var svc scepserver.Service // scep service
+	{
+		svc, err = scepserver.NewService(depot, []byte(""))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 	ctx := context.Background()
 	logger := kitlog.NewNopLogger()
 	handler := scepserver.ServiceHandler(ctx, svc, logger)

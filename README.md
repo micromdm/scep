@@ -1,12 +1,15 @@
 SCEP server and Go library
 
 # Standalone server and client binaries
-WIP
+A standalone go server is available under `cmd/scep/main.go`
 
-# Server and client libraries
-WIP
-
-The server and client libraries are standard go-kit services which can be bundled as part of a bigger Go application.  
+```
+Usage of ./cmd/scep/scep:
+  -depot string
+    	path to ca folder (default "depot")
+  -port string
+    	port to listen on (default "8080")
+```
 
 # SCEP library
 
@@ -65,3 +68,7 @@ if err != nil {
 // w is a http.ResponseWriter
 w.Write(certRep.Raw)
 ```
+
+# Server library
+
+You can import the scep endpoint into another Go project. For an example take a look at `cmd/scep/main.go`
