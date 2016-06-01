@@ -7,6 +7,7 @@ type SCEPRequest struct {
 	Operation  string
 	Message    []byte
 	PKIMessage *scep.PKIMessage
+	Err        error // request error
 }
 
 // SCEPResponse is a SCEP server response.
@@ -14,4 +15,6 @@ type SCEPRequest struct {
 // with pkiStatus FAILURE and a failInfo attribute.
 type SCEPResponse struct {
 	PKIMessage *scep.PKIMessage
+	Data       []byte // a non pkiMessage response
+	Err        error  // resposne error
 }

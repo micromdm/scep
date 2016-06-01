@@ -30,7 +30,8 @@ type service struct {
 }
 
 func (svc service) GetCACaps(ctx context.Context) ([]byte, error) {
-	panic("not implemented")
+	defaultCaps := []byte(`POSTPKIOperation`)
+	return defaultCaps, nil
 }
 
 func (svc service) GetCACert(ctx context.Context) ([]byte, error) {
