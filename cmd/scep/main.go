@@ -13,14 +13,28 @@ import (
 	"golang.org/x/net/context"
 )
 
+// version info
+var (
+	version = "unreleased"
+	gitHash = "unknown"
+)
+
 func main() {
 	// flags
 	var (
+		flVersion           = flag.Bool("version", false, "prints version information")
 		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 	)
 	flag.Parse()
+
+	// print version information
+	if *flVersion {
+		fmt.Printf("scep - %v\n", version)
+		fmt.Printf("git revision - %v\n", gitHash)
+		os.Exit(0)
+	}
 	port := ":" + *flPort
 	ctx := context.Background()
 
