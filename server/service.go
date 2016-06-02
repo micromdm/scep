@@ -86,6 +86,7 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+
 	// create cert template
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
@@ -93,8 +94,8 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 		NotBefore:    time.Now().Add(-600).UTC(),
 		NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
 		SubjectKeyId: id,
+		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageAny,
 			x509.ExtKeyUsageClientAuth,
 		},
 	}

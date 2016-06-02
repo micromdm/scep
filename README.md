@@ -1,14 +1,45 @@
-SCEP server and Go library
+`scep` is a Simple Certificate Enrollment Protocol server.
 
-# Standalone server and client binaries
-A standalone go server is available under `cmd/scep/main.go`
+# Installation
+A binary release is available on the releases page.
+
+# Usage
+
+The default flags configure and run the scep server.  
+depot must be the path to a folder with `ca.pem` and `ca.key` files. 
+
+If you don't already have a CA to use, you can create one using the `scep ca` subcommand.
 
 ```
 Usage of ./cmd/scep/scep:
+  -challenge string
+    	enforce a challenge password
   -depot string
     	path to ca folder (default "depot")
   -port string
     	port to listen on (default "8080")
+  -version
+    	prints version information
+```
+
+`scep ca -init` to create a new CA and private key. 
+
+```
+Usage of ./cmd/scep/scep ca:
+  -country string
+    	country for CA cert (default "US")
+  -depot string
+    	path to ca folder (default "depot")
+  -init
+    	create a new CA
+  -key-password string
+    	password to store rsa key
+  -keySize int
+    	rsa key size (default 4096)
+  -organization string
+    	organization for CA cert (default "scep-ca")
+  -years int
+    	default CA years (default 10)
 ```
 
 # SCEP library
