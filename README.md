@@ -42,6 +42,16 @@ Usage of ./cmd/scep/scep ca:
     	default CA years (default 10)
 ```
 
+# Docker
+```
+docker pull micromdm/scep
+# create CA
+docker run -it --rm -v /path/to/ca/folder:/depot micromdm/scep ./scep ca -init
+
+# run
+docker run -it --rm -v /path/to/ca/folder:/depot -p 8080:8080 micromdm/scep
+```
+
 # SCEP library
 
 ```
