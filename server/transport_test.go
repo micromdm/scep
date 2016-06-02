@@ -1,6 +1,7 @@
 package scepserver_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -29,10 +30,24 @@ func TestCACaps(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Error("expected", http.StatusOK, "got", resp.StatusCode)
 	}
-
 }
 
-func newServer(t *testing.T) (*httptest.Server, scepserver.Service) {
+func TestPKIOperation(t *testing.T) {
+	server, _ := newServer(t)
+	defer server.Close()
+	pkcsreq := loadTestFile(t, "../scep/testdata/PKCSReq.der")
+	body := bytes.NewReader(pkcsreq)
+	url := server.URL + "/scep?operation=PKIOperation"
+	resp, err := http.Post(url, "", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Error("expected", http.StatusOK, "got", resp.StatusCode)
+	}
+}
+
+func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server, scepserver.Service) {
 	var err error
 	var depot scepserver.Depot // cert storage
 	{
@@ -43,7 +58,7 @@ func newServer(t *testing.T) (*httptest.Server, scepserver.Service) {
 	}
 	var svc scepserver.Service // scep service
 	{
-		svc, err = scepserver.NewService(depot, []byte(""))
+		svc, err = scepserver.NewService(depot, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,6 +75,14 @@ const (
 	rsaPrivateKeyPEMBlockType = "RSA PRIVATE KEY"
 	certificatePEMBlockType   = "CERTIFICATE"
 )
+
+func loadTestFile(t *testing.T, path string) []byte {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
 
 // create a new RSA private key
 func newRSAKey(bits int) (*rsa.PrivateKey, error) {
@@ -151,5 +174,4 @@ func loadKeyFromFile(path string) (*rsa.PrivateKey, error) {
 	}
 
 	return x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-
 }

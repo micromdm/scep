@@ -10,6 +10,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"errors"
@@ -93,6 +94,7 @@ var (
 	oidSCEPsenderNonce    = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 5}
 	oidSCEPrecipientNonce = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 6}
 	oidSCEPtransactionID  = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 7}
+	oidChallengePassword  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 7}
 )
 
 // PKIMessage defines the possible SCEP message types
@@ -138,6 +140,8 @@ type CertRepMessage struct {
 type CSRReqMessage struct {
 	// PKCS#10 Certificate request inside the envelope
 	CSR *x509.CertificateRequest
+
+	ChallengePassword string
 }
 
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
@@ -226,6 +230,57 @@ func (msg *PKIMessage) parseMessageType() error {
 	}
 }
 
+type publicKeyInfo struct {
+	Raw       asn1.RawContent
+	Algorithm pkix.AlgorithmIdentifier
+	PublicKey asn1.BitString
+}
+
+type tbsCertificateRequest struct {
+	Raw           asn1.RawContent
+	Version       int
+	Subject       asn1.RawValue
+	PublicKey     publicKeyInfo
+	RawAttributes []asn1.RawValue `asn1:"tag:0"`
+}
+
+type certificateRequest struct {
+	Raw                asn1.RawContent
+	TBSCSR             tbsCertificateRequest
+	SignatureAlgorithm pkix.AlgorithmIdentifier
+	SignatureValue     asn1.BitString
+}
+
+// stdlib ignores the challengePassword attribute in csr
+func parseChallengePassword(asn1Data []byte) (string, error) {
+	type attribute struct {
+		ID    asn1.ObjectIdentifier
+		Value asn1.RawValue `asn1:"set"`
+	}
+	var csr certificateRequest
+	rest, err := asn1.Unmarshal(asn1Data, &csr)
+	if err != nil {
+		return "", err
+	} else if len(rest) != 0 {
+		err = asn1.SyntaxError{Msg: "trailing data"}
+		return "", err
+	}
+
+	var password string
+	for _, rawAttr := range csr.TBSCSR.RawAttributes {
+		var attr attribute
+		_, err := asn1.Unmarshal(rawAttr.FullBytes, &attr)
+		if err != nil {
+			return "", err
+		}
+		if attr.ID.Equal(oidChallengePassword) {
+			password = string(attr.Value.Bytes)
+		}
+	}
+
+	return password, nil
+}
+
 // DecryptPKIEnvelope decrypts the pkcs envelopedData inside the SCEP PKIMessage
 func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.PrivateKey) error {
 	p7, err := pkcs7.Parse(msg.p7.Content)
@@ -245,8 +300,14 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 		if err != nil {
 			return err
 		}
+		// check for challengePassword
+		cp, err := parseChallengePassword(msg.pkiEnvelope)
+		if err != nil {
+			return err
+		}
 		msg.CSRReqMessage = &CSRReqMessage{
-			CSR: csr,
+			CSR:               csr,
+			ChallengePassword: cp,
 		}
 		return nil
 	case GetCRL, GetCert, CertPoll:

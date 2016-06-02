@@ -37,10 +37,12 @@ type Service interface {
 }
 
 type service struct {
-	depot       Depot
-	ca          []*x509.Certificate // CA cert or chain
-	caKey       *rsa.PrivateKey
-	csrTemplate *x509.Certificate
+	depot             Depot
+	ca                []*x509.Certificate // CA cert or chain
+	caKey             *rsa.PrivateKey
+	caKeyPassword     []byte
+	csrTemplate       *x509.Certificate
+	challengePassword string
 }
 
 func (svc service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -64,6 +66,14 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 	ca := svc.ca[0]
 	if err := msg.DecryptPKIEnvelope(svc.ca[0], svc.caKey); err != nil {
 		return nil, err
+	}
+
+	// validate challenge passwords
+	if msg.MessageType == scep.PKCSReq {
+		if !svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword) {
+			// handle err
+			return nil, errors.New("scep challenge password does not match")
+		}
 	}
 
 	csr := msg.CSRReqMessage.CSR
@@ -98,17 +108,55 @@ func (svc service) GetNextCACert(ctx context.Context) ([]byte, error) {
 	panic("not implemented")
 }
 
+func (svc service) challengePasswordMatch(pw string) bool {
+	if svc.challengePassword == "" {
+		// empty password, don't validate
+		return true
+	}
+	if svc.challengePassword == pw {
+		return true
+	}
+	return false
+}
+
+// ServiceOption is a server configuration option
+type ServiceOption func(*service) error
+
+// ChallengePassword is an optional argument to NewService
+// which allows setting a preshared key for SCEP.
+func ChallengePassword(pw string) ServiceOption {
+	return func(s *service) error {
+		s.challengePassword = pw
+		return nil
+	}
+}
+
+// CAKeyPassword is an optional argument to NewService for
+// specifying the CA private key password.
+func CAKeyPassword(pw []byte) ServiceOption {
+	return func(s *service) error {
+		s.caKeyPassword = pw
+		return nil
+	}
+}
+
 // NewService creates a new scep service
-func NewService(depot Depot, password []byte) (Service, error) {
-	ca, caKey, err := depot.CA(password)
+func NewService(depot Depot, opts ...ServiceOption) (Service, error) {
+	s := &service{
+		depot: depot,
+	}
+	for _, opt := range opts {
+		if err := opt(s); err != nil {
+			return nil, err
+		}
+	}
+
+	var err error
+	s.ca, s.caKey, err = depot.CA(s.caKeyPassword)
 	if err != nil {
 		return nil, err
 	}
-	return &service{
-		depot: depot,
-		ca:    ca,
-		caKey: caKey,
-	}, nil
+	return s, nil
 }
 
 // rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.

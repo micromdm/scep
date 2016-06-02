@@ -42,7 +42,7 @@ func main() {
 
 	var svc scepserver.Service // scep service
 	{
-		svc, err = scepserver.NewService(depot, []byte(""))
+		svc, err = scepserver.NewService(depot)
 		if err != nil {
 			logger.Log("err", err)
 			os.Exit(1)
