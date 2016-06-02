@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"math/big"
 	"os"
 	"path/filepath"
 )
@@ -13,6 +14,8 @@ import (
 // Depot is a repository for managing certificates
 type Depot interface {
 	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
+	Put(name string, cert []byte) error
+	Serial() (*big.Int, error)
 }
 
 // NewFileDepot returns a new cert depot
@@ -44,11 +47,94 @@ func (d fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 	return []*x509.Certificate{cert}, key, nil
 }
 
+// file permissions
 const (
-	rootPerm   = 0400
-	branchPerm = 0440
-	leafPerm   = 0444
+	certPerm   = 0444
+	serialPerm = 0400
 )
+
+// Put adds a certificate to the depot
+func (d fileDepot) Put(name string, data []byte) error {
+	if data == nil {
+		return errors.New("data is nil")
+	}
+
+	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
+		return err
+	}
+
+	serial, err := d.Serial()
+	if err != nil {
+		return err
+	}
+
+	name = d.path(name) + "." + serial.String() + ".pem"
+	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, certPerm)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if _, err := file.Write(pemCert(data)); err != nil {
+		file.Close()
+		os.Remove(name)
+		return err
+	}
+
+	if err := d.incrementSerial(serial); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (d fileDepot) Serial() (*big.Int, error) {
+	name := d.path("serial")
+	s := big.NewInt(2)
+	if err := d.check("serial"); err != nil {
+		// assuming it doesnt exist, create
+		if err := d.writeSerial(s); err != nil {
+			return nil, err
+		}
+		return s, nil
+	}
+	data, err := ioutil.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+	serial := s.SetBytes(data)
+	return serial, nil
+}
+
+func (d fileDepot) writeSerial(serial *big.Int) error {
+	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
+		return err
+	}
+	name := d.path("serial")
+	os.Remove(name)
+
+	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, serialPerm)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	if _, err := file.Write(serial.Bytes()); err != nil {
+		file.Close()
+		os.Remove(name)
+		return err
+	}
+	return nil
+}
+
+// read serial and increment
+func (d fileDepot) incrementSerial(s *big.Int) error {
+	serial := s.Add(s, big.NewInt(1))
+	if err := d.writeSerial(serial); err != nil {
+		return err
+	}
+	return nil
+}
 
 type file struct {
 	Info os.FileInfo
@@ -114,4 +200,14 @@ func loadCert(data []byte) (*x509.Certificate, error) {
 	}
 
 	return x509.ParseCertificate(pemBlock.Bytes)
+}
+
+func pemCert(derBytes []byte) []byte {
+	pemBlock := &pem.Block{
+		Type:    certificatePEMBlockType,
+		Headers: nil,
+		Bytes:   derBytes,
+	}
+	out := pem.EncodeToMemory(pemBlock)
+	return out
 }

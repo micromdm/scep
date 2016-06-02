@@ -82,9 +82,13 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 		return nil, err
 	}
 
+	serial, err := svc.depot.Serial()
+	if err != nil {
+		return nil, err
+	}
 	// create cert template
 	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(4),
+		SerialNumber: serial,
 		Subject:      csr.Subject,
 		NotBefore:    time.Now().Add(-600).UTC(),
 		NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
@@ -100,8 +104,21 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 		return nil, err
 	}
 
+	crt := certRep.CertRepMessage.Certificate
+	name := certName(crt)
+	if err := svc.depot.Put(name, crt.Raw); err != nil {
+		return nil, err
+	}
+
 	return certRep.Raw, nil
 
+}
+
+func certName(crt *x509.Certificate) string {
+	if crt.Subject.CommonName != "" {
+		return crt.Subject.CommonName
+	}
+	return string(crt.Signature)
 }
 
 func (svc service) GetNextCACert(ctx context.Context) ([]byte, error) {
