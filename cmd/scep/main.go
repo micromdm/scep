@@ -33,7 +33,7 @@ var (
 func main() {
 	var caCMD = flag.NewFlagSet("ca", flag.ExitOnError)
 	{
-		if len(os.Args) >= 1 {
+		if len(os.Args) >= 2 {
 			if os.Args[1] == "ca" {
 				status := caMain(caCMD)
 				os.Exit(status)
