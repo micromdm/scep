@@ -51,6 +51,7 @@ func main() {
 			logger.Log("err", err)
 			os.Exit(1)
 		}
+		svc = scepserver.NewLoggingService(log.NewContext(logger).With("component", "service"), svc)
 	}
 
 	var h http.Handler // http handler
