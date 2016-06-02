@@ -16,8 +16,9 @@ import (
 func main() {
 	// flags
 	var (
-		flPort      = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
-		flDepotPath = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
+		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
+		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
+		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 	)
 	flag.Parse()
 	port := ":" + *flPort
@@ -42,7 +43,10 @@ func main() {
 
 	var svc scepserver.Service // scep service
 	{
-		svc, err = scepserver.NewService(depot)
+		svcOptions := []scepserver.ServiceOption{
+			scepserver.ChallengePassword(*flChallengePassword),
+		}
+		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
 			logger.Log("err", err)
 			os.Exit(1)
