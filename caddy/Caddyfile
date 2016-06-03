@@ -1,0 +1,7 @@
+0.0.0.0
+
+scep {
+    depot ../scep/testdata/testca
+    # keepass secret
+    # challenge sharedsecret
+}
