@@ -1,7 +1,18 @@
-0.0.0.0
+http://scep.groob.io:2016 {
+    browse
+    log
+    scep {
+        depot ../scep/testdata/testca
+        # keepass secret
+        # challenge sharedsecret
+    }
+}
 
-scep {
-    depot ../scep/testdata/testca
-    # keepass secret
-    # challenge sharedsecret
+
+https://mdm.groob.io:2015 {
+    browse
+    log
+    tls mdm.groob.io.crt mdm.groob.io.key {
+        clients ../scep/testdata/testca/ca.pem
+    }
 }
