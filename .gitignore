@@ -1,4 +1,4 @@
 .DS_Store
-cmd/scep/scep
+cmd/scepserver/scepserver
 cmd/scepclient/scepclient
 build/
