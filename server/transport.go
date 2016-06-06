@@ -1,6 +1,7 @@
 package scepserver
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -38,6 +39,30 @@ func updateContext(ctx context.Context, r *http.Request) context.Context {
 		ctx = context.WithValue(ctx, "operation", q.Get("operation"))
 	}
 	return ctx
+}
+
+// EncodeSCEPRequest encodes a SCEP http request
+func EncodeSCEPRequest(ctx context.Context, r *http.Request, request interface{}) error {
+	req := request.(SCEPRequest)
+	params := r.URL.Query()
+	params.Set("operation", req.Operation)
+	switch r.Method {
+	case "GET":
+		if len(req.Message) > 0 {
+			return errors.New("only POSTPKIOperation supported")
+		}
+	case "POST":
+		var buf bytes.Buffer
+		_, err := buf.Write(req.Message)
+		if err != nil {
+			return err
+		}
+		r.Body = ioutil.NopCloser(&buf)
+	default:
+		return errors.New("method not supported")
+	}
+	r.URL.RawQuery = params.Encode()
+	return nil
 }
 
 // DecodeSCEPRequest decodes an HTTP request to the SCEP server
@@ -84,6 +109,18 @@ func encodeSCEPResponse(ctx context.Context, w http.ResponseWriter, response int
 	return nil
 }
 
+// DecodeSCEPResponse decodes a SCEP response
+func DecodeSCEPResponse(ctx context.Context, r *http.Response) (interface{}, error) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	resp := SCEPResponse{
+		Data: data,
+	}
+	return resp, nil
+}
+
 const (
 	certChainHeader = "application/x-x509-ca-ra-cert"
 	pkiOpHeader     = "application/x-pki-message"
@@ -128,7 +165,7 @@ func makeSCEPEndpoint(svc Service) endpoint.Endpoint {
 			}
 			return SCEPResponse{Data: resp}, nil
 		default:
-			return nil, errors.New("not implemented")
+			return nil, errors.New("operation not implemented")
 		}
 	}
 }

@@ -294,7 +294,12 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 
 	switch msg.MessageType {
 	case CertRep:
-		return errNotImplemented
+		certs, err := CACerts(msg.pkiEnvelope)
+		if err != nil {
+			return err
+		}
+		msg.CertRepMessage.Certificate = certs[0]
+		return nil
 	case PKCSReq, UpdateReq, RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
@@ -418,6 +423,15 @@ func DegenerateCertificates(certs []*x509.Certificate) ([]byte, error) {
 		return nil, err
 	}
 	return degenerate, nil
+}
+
+// CACerts extract CA Certificate or chain from pkcs7 degenerate signed data
+func CACerts(data []byte) ([]*x509.Certificate, error) {
+	p7, err := pkcs7.Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	return p7.Certificates, nil
 }
 
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
