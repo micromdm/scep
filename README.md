@@ -1,9 +1,21 @@
-`scep` is a Simple Certificate Enrollment Protocol server.
+`scep` is a Simple Certificate Enrollment Protocol server and client
 
 # Installation
 A binary release is available on the releases page.
 
-# Usage
+# Example
+minimal example for both server and client
+```
+# create a new CA
+scepserver ca -init
+# start server
+scepserver -depot depot -port 2016 -challenge=secret
+
+# in a separate terminal window, run a client
+# note, if the client.key doesn't exist, the client will create a new rsa private key. Must be in PEM format.
+scepclient -private-key client.key -server-url=http://scep.groob.io:2016 -challenge=secret
+```
+# Server Usage
 
 The default flags configure and run the scep server.  
 depot must be the path to a folder with `ca.pem` and `ca.key` files. 
@@ -11,7 +23,7 @@ depot must be the path to a folder with `ca.pem` and `ca.key` files.
 If you don't already have a CA to use, you can create one using the `scep ca` subcommand.
 
 ```
-Usage of ./cmd/scep/scep:
+Usage of ./cmd/scepserver/scepserver:
   -challenge string
     	enforce a challenge password
   -depot string
@@ -25,7 +37,7 @@ Usage of ./cmd/scep/scep:
 `scep ca -init` to create a new CA and private key. 
 
 ```
-Usage of ./cmd/scep/scep ca:
+Usage of ./cmd/scepserver/scepserver ca:
   -country string
     	country for CA cert (default "US")
   -depot string
@@ -40,6 +52,30 @@ Usage of ./cmd/scep/scep ca:
     	organization for CA cert (default "scep-ca")
   -years int
     	default CA years (default 10)
+```
+
+# Client Usage
+
+```
+Usage of scepclient:
+  -certificate string
+    	certificate path, if there is no key, scepclient will create one
+  -challenge string
+    	enforce a challenge password
+  -cn string
+    	common name for certificate (default "scepclient")
+  -country string
+    	country code in certificate (default "US")
+  -keySize int
+    	rsa key size (default 2048)
+  -organization string
+    	organization for cert (default "scep-client")
+  -private-key string
+    	private key path, if there is no key, scepclient will create one
+  -server-url string
+    	SCEP server url
+  -version
+    	prints version information
 ```
 
 # Docker
