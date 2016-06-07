@@ -13,7 +13,6 @@ import (
 
 	"golang.org/x/net/context"
 
-	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
 )
@@ -23,6 +22,147 @@ var (
 	version = "unreleased"
 	gitHash = "unknown"
 )
+
+type runCfg struct {
+	dir          string
+	csrPath      string
+	keyPath      string
+	keyBits      int
+	selfSignPath string
+	certPath     string
+	cn           string
+	org          string
+	country      string
+	challenge    string
+	serverURL    string
+}
+
+func run(cfg runCfg) error {
+	key, err := loadOrMakeKey(cfg.keyPath, cfg.keyBits)
+	if err != nil {
+		return err
+	}
+
+	opts := &csrOptions{
+		cn:        cfg.cn,
+		org:       cfg.org,
+		country:   strings.ToUpper(cfg.country),
+		challenge: cfg.challenge,
+		key:       key,
+	}
+
+	csr, err := loadOrMakeCSR(cfg.csrPath, opts)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	var self *x509.Certificate
+	cert, err := loadPEMCertFromFile(cfg.certPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
+		s, err := loadOrSign(cfg.selfSignPath, key, csr)
+		if err != nil {
+			return err
+		}
+		self = s
+	}
+
+	ctx := context.Background()
+	var client scepclient.Client
+	{
+		client = scepclient.NewClient(cfg.serverURL)
+	}
+
+	resp, err := client.GetCACert(ctx)
+	if err != nil {
+		return err
+	}
+	certs, err := scep.CACerts(resp)
+	if err != nil {
+		return err
+	}
+
+	var signerCert *x509.Certificate
+	{
+		if cert != nil {
+			signerCert = cert
+		} else {
+			signerCert = self
+		}
+	}
+
+	var msgType scep.MessageType
+	{
+		// TODO validate CA and set UpdateReq if needed
+		if cert != nil {
+			msgType = scep.RenewalReq
+		} else {
+			msgType = scep.PKCSReq
+		}
+	}
+
+	tmpl := &scep.PKIMessage{
+		MessageType: msgType,
+		Recipients:  certs,
+		SignerKey:   key,
+		SignerCert:  signerCert,
+	}
+
+	if cfg.challenge != "" && msgType == scep.PKCSReq {
+		tmpl.CSRReqMessage = &scep.CSRReqMessage{
+			ChallengePassword: cfg.challenge,
+		}
+	}
+
+	msg, err := scep.NewCSRRequest(csr, tmpl)
+	if err != nil {
+		return err
+	}
+
+	respBytes, err := client.PKIOperation(ctx, msg.Raw)
+	if err != nil {
+		return err
+	}
+	respMsg, err := scep.ParsePKIMessage(respBytes)
+	if err != nil {
+		return err
+	}
+	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	respCert := respMsg.CertRepMessage.Certificate
+	if err := ioutil.WriteFile(cfg.certPath, pemCert(respCert.Raw), 0666); err != nil {
+		return err
+	}
+
+	// remove self signer if used
+	if self != nil {
+		if err := os.Remove(cfg.selfSignPath); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateFlags(keyPath, serverURL string) error {
+	if keyPath == "" {
+		return errors.New("must specify private key path")
+	}
+	if serverURL == "" {
+		return errors.New("must specify server-url flag parameter")
+	}
+	_, err := url.Parse(serverURL)
+	if err != nil {
+		return fmt.Errorf("invalid server-url flag parameter %s", err)
+	}
+	return nil
+}
 
 func main() {
 	// flags
@@ -58,137 +198,22 @@ func main() {
 		*flCertPath = dir + "/client.pem"
 	}
 
-	key, err := loadOrMakeKey(*flPKeyPath, *flKeySize)
-	if err != nil {
+	cfg := runCfg{
+		dir:          dir,
+		csrPath:      csrPath,
+		keyPath:      *flPKeyPath,
+		keyBits:      *flKeySize,
+		selfSignPath: selfSignPath,
+		certPath:     *flCertPath,
+		cn:           *flCName,
+		org:          *flOrg,
+		country:      *flCountry,
+		challenge:    *flChallengePassword,
+		serverURL:    *flServerURL,
+	}
+
+	if err := run(cfg); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	opts := &csrOptions{
-		cn:        *flCName,
-		org:       *flOrg,
-		country:   strings.ToUpper(*flCountry),
-		challenge: *flChallengePassword,
-		key:       key,
-	}
-
-	csr, err := loadOrMakeCSR(csrPath, opts)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	var self *x509.Certificate
-	cert, err := loadPEMCertFromFile(*flCertPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			// fail
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		s, err := loadOrSign(selfSignPath, key, csr)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-		self = s
-
-	}
-
-	ctx := context.Background()
-	var logger log.Logger
-	{
-		logger = log.NewLogfmtLogger(os.Stderr)
-	}
-	var client scepclient.Client
-	{
-
-		client = scepclient.NewClient(*flServerURL, logger)
-
-	}
-
-	resp, err := client.GetCACert(ctx)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	certs, err := scep.CACerts(resp)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	var signerCert *x509.Certificate
-	{
-		if cert != nil {
-			signerCert = cert
-		} else {
-			signerCert = self
-		}
-	}
-
-	var msgType scep.MessageType
-	{
-		// TODO validate CA and set UpdateReq if needed
-		if cert != nil {
-			msgType = scep.RenewalReq
-		} else {
-			msgType = scep.PKCSReq
-		}
-	}
-	tmpl := &scep.PKIMessage{
-		MessageType: msgType,
-		Recipients:  certs,
-		SignerKey:   key,
-		SignerCert:  signerCert,
-	}
-
-	msg, err := scep.NewCSRRequest(csr, tmpl)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	respBytes, err := client.PKIOperation(ctx, msg.Raw)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	respMsg, err := scep.ParsePKIMessage(respBytes)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	respCert := respMsg.CertRepMessage.Certificate
-	if err := ioutil.WriteFile(*flCertPath, pemCert(respCert.Raw), 0666); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	// remove self signer if used
-	if self != nil {
-		if err := os.Remove(selfSignPath); err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-	}
-}
-
-func validateFlags(keyPath, serverURL string) error {
-	if keyPath == "" {
-		return errors.New("must specify private key path")
-	}
-	if serverURL == "" {
-		return errors.New("must specify server-url flag parameter")
-	}
-	_, err := url.Parse(serverURL)
-	if err != nil {
-		return fmt.Errorf("invalid server-url flag parameter %s", err)
-	}
-	return nil
 }
