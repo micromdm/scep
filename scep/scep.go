@@ -281,6 +281,63 @@ func parseChallengePassword(asn1Data []byte) (string, error) {
 	return password, nil
 }
 
+// AddChallenge adds a challenge password to the CSR
+func addChallenge(csr *x509.CertificateRequest, challenge string) ([]byte, error) {
+	// unmarshal csr
+	var req certificateRequest
+	rest, err := asn1.Unmarshal(csr.Raw, &req)
+	if err != nil {
+		return nil, err
+	} else if len(rest) != 0 {
+		err = asn1.SyntaxError{Msg: "trailing data"}
+		return nil, err
+	}
+
+	passwordAttribute := pkix.AttributeTypeAndValue{
+		Type:  oidChallengePassword,
+		Value: []byte(challenge),
+	}
+	b, err := asn1.Marshal(passwordAttribute)
+
+	var rawAttribute asn1.RawValue
+	rest, err = asn1.Unmarshal(b, &rawAttribute)
+	if err != nil {
+		return nil, err
+	} else if len(rest) != 0 {
+		err = asn1.SyntaxError{Msg: "trailing data"}
+		return nil, err
+	}
+
+	// append attribute
+	req.TBSCSR.RawAttributes = append(req.TBSCSR.RawAttributes, rawAttribute)
+
+	// recreate request
+	tbsCSR := tbsCertificateRequest{
+		Version:       0,
+		Subject:       req.TBSCSR.Subject,
+		PublicKey:     req.TBSCSR.PublicKey,
+		RawAttributes: req.TBSCSR.RawAttributes,
+	}
+
+	tbsCSRContents, err := asn1.Marshal(tbsCSR)
+	if err != nil {
+		return nil, err
+	}
+	tbsCSR.Raw = tbsCSRContents
+
+	// marshal csr with challenge password
+	csrBytes, err := asn1.Marshal(certificateRequest{
+		TBSCSR:             tbsCSR,
+		SignatureAlgorithm: req.SignatureAlgorithm,
+		SignatureValue:     req.SignatureValue,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return csrBytes, nil
+}
+
 // DecryptPKIEnvelope decrypts the pkcs envelopedData inside the SCEP PKIMessage
 func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.PrivateKey) error {
 	p7, err := pkcs7.Parse(msg.p7.Content)
@@ -436,7 +493,17 @@ func CACerts(data []byte) ([]*x509.Certificate, error) {
 
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
 func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage, error) {
-	e7, err := pkcs7.Encrypt(csr.Raw, tmpl.Recipients)
+	csrBytes := csr.Raw
+	if tmpl.CSRReqMessage != nil {
+		if tmpl.ChallengePassword != "" {
+			b, err := addChallenge(csr, tmpl.ChallengePassword)
+			if err != nil {
+				return nil, err
+			}
+			csrBytes = b
+		}
+	}
+	e7, err := pkcs7.Encrypt(csrBytes, tmpl.Recipients)
 	if err != nil {
 		return nil, err
 	}
