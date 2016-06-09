@@ -35,7 +35,6 @@ func (c *client) Supports(cap string) bool {
 // NewClient returns a SCEP service that's backed by the provided Endpoint
 func NewClient(baseURL string) Client {
 	scepURL, _ := url.Parse(baseURL)
-	scepURL.Path = "/scep"
 	httpc := http.DefaultClient
 	return &client{
 		getRemote: httptransport.NewClient(
