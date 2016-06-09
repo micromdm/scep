@@ -24,7 +24,7 @@ type Service interface {
 	// GetCACert returns CA certificate or
 	// a CA certificate chain with intermediates
 	// in a PKCS#7 Degenerate Certificates format
-	GetCACert(ctx context.Context) ([]byte, error)
+	GetCACert(ctx context.Context) ([]byte, int, error)
 
 	// PKIOperation handles incoming SCEP messages such as PKCSReq and
 	// sends back a CertRep PKIMessag.
@@ -50,11 +50,15 @@ func (svc service) GetCACaps(ctx context.Context) ([]byte, error) {
 	return defaultCaps, nil
 }
 
-func (svc service) GetCACert(ctx context.Context) ([]byte, error) {
+func (svc service) GetCACert(ctx context.Context) ([]byte, int, error) {
 	if len(svc.ca) == 0 {
-		return nil, errors.New("missing CA Cert")
+		return nil, 0, errors.New("missing CA Cert")
 	}
-	return scep.DegenerateCertificates(svc.ca)
+	if len(svc.ca) == 1 {
+		return svc.ca[0].Raw, 1, nil
+	}
+	data, err := scep.DegenerateCertificates(svc.ca)
+	return data, len(svc.ca), err
 }
 
 func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {

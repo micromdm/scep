@@ -104,7 +104,7 @@ func encodeSCEPResponse(ctx context.Context, w http.ResponseWriter, response int
 		fmt.Println(resp.Err)
 		return resp.Err
 	}
-	w.Header().Set("Content-Type", contentHeader(ctx))
+	w.Header().Set("Content-Type", contentHeader(ctx, resp.CACertNum))
 	w.Write(resp.Data)
 	return nil
 }
@@ -118,19 +118,29 @@ func DecodeSCEPResponse(ctx context.Context, r *http.Response) (interface{}, err
 	resp := SCEPResponse{
 		Data: data,
 	}
+	header := r.Header.Get("Content-Type")
+	if header == certChainHeader {
+		// TODO decode the response instead of just passing []byte around
+		// 0 or 1
+		resp.CACertNum = 2
+	}
 	return resp, nil
 }
 
 const (
 	certChainHeader = "application/x-x509-ca-ra-cert"
+	leafHeader      = "application/x-x509-ca-cert"
 	pkiOpHeader     = "application/x-pki-message"
 )
 
-func contentHeader(ctx context.Context) string {
+func contentHeader(ctx context.Context, certNum int) string {
 	op := ctx.Value("operation")
 	switch op {
 	case "GetCACert":
-		return certChainHeader
+		if certNum > 1 {
+			return certChainHeader
+		}
+		return leafHeader
 	case "PKIOperation":
 		return pkiOpHeader
 	default:
@@ -153,9 +163,9 @@ func makeSCEPEndpoint(svc Service) endpoint.Endpoint {
 			}
 			return SCEPResponse{Data: caps}, nil
 		case "GetCACert":
-			cert, err := svc.GetCACert(ctx)
+			cert, certNum, err := svc.GetCACert(ctx)
 			if err != nil {
-				return SCEPResponse{Err: err}, nil
+				return SCEPResponse{Err: err, CACertNum: certNum}, nil
 			}
 			return SCEPResponse{Data: cert}, nil
 		case "PKIOperation":

@@ -67,16 +67,16 @@ func (c *client) GetCACaps(ctx context.Context) ([]byte, error) {
 	return r.Data, nil
 }
 
-func (c *client) GetCACert(ctx context.Context) ([]byte, error) {
+func (c *client) GetCACert(ctx context.Context) ([]byte, int, error) {
 	request := scepserver.SCEPRequest{
 		Operation: "GetCACert",
 	}
 	reply, err := c.getRemote(ctx, request)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	r := reply.(scepserver.SCEPResponse)
-	return r.Data, nil
+	return r.Data, r.CACertNum, nil
 }
 
 func (c *client) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {

@@ -11,6 +11,7 @@ type SCEPRequest struct {
 // Business errors will be encoded as a CertRep message
 // with pkiStatus FAILURE and a failInfo attribute.
 type SCEPResponse struct {
-	Data []byte
-	Err  error // response error
+	CACertNum int //chain
+	Data      []byte
+	Err       error // response error
 }

@@ -76,13 +76,23 @@ func run(cfg runCfg) error {
 		client = scepclient.NewClient(cfg.serverURL)
 	}
 
-	resp, err := client.GetCACert(ctx)
+	resp, certNum, err := client.GetCACert(ctx)
 	if err != nil {
 		return err
 	}
-	certs, err := scep.CACerts(resp)
-	if err != nil {
-		return err
+	var certs []*x509.Certificate
+	{
+		if certNum > 1 {
+			certs, err = scep.CACerts(resp)
+			if err != nil {
+				return err
+			}
+		} else {
+			certs, err = x509.ParseCertificates(resp)
+			if err != nil {
+				return err
+			}
+		}
 	}
 
 	var signerCert *x509.Certificate
