@@ -87,6 +87,9 @@ func run(cfg runCfg) error {
 			if err != nil {
 				return err
 			}
+			if len(certs) < 1 {
+				return fmt.Errorf("no certificates returned")
+			}
 		} else {
 			certs, err = x509.ParseCertificates(resp)
 			if err != nil {
