@@ -9,14 +9,14 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/go-kit/kit/log"
-	"github.com/mholt/caddy/caddy/setup"
-	"github.com/mholt/caddy/middleware"
+	"github.com/mholt/caddy"
+	"github.com/mholt/caddy/caddyhttp/httpserver"
 	"github.com/micromdm/scep/server"
 )
 
 // SCEP holds the configuration for the SCEP server
 type SCEP struct {
-	next              middleware.Handler
+	next              httpserver.Handler
 	challengePassword string
 	depotPath         string // cert store path
 	caKeyPassword     []byte
@@ -26,7 +26,7 @@ type SCEP struct {
 func (s SCEP) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	paths := []string{"/scep"}
 	for _, p := range paths {
-		if middleware.Path(r.URL.Path).Matches(p) {
+		if httpserver.Path(r.URL.Path).Matches(p) {
 			s.scepHandler.ServeHTTP(w, r)
 			return 0, nil
 		}
@@ -34,21 +34,28 @@ func (s SCEP) ServeHTTP(w http.ResponseWriter, r *http.Request) (int, error) {
 	return s.next.ServeHTTP(w, r)
 }
 
+func init() {
+	caddy.RegisterPlugin("scep", caddy.Plugin{
+		ServerType: "http",
+		Action:     setup,
+	})
+}
+
 // Setup creates a caddy middleware
-func Setup(c *setup.Controller) (middleware.Middleware, error) {
+func setup(c *caddy.Controller) error {
 	scp, err := parse(c)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Runs on Caddy startup, useful for services or other setups.
-	c.Startup = append(c.Startup, func() error {
+	c.OnStartup(func() error {
 		fmt.Println("scep middleware is initiated")
 		return nil
 	})
 
 	// Runs on Caddy shutdown, useful for cleanups.
-	c.Shutdown = append(c.Shutdown, func() error {
+	c.OnShutdown(func() error {
 		fmt.Println("api middleware is cleaning up")
 		return nil
 	})
@@ -66,7 +73,7 @@ func Setup(c *setup.Controller) (middleware.Middleware, error) {
 	{
 		depot, err = scepserver.NewFileDepot(scp.depotPath)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	// scep service
@@ -77,7 +84,7 @@ func Setup(c *setup.Controller) (middleware.Middleware, error) {
 		}
 		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		svc = scepserver.NewLoggingService(log.NewContext(logger).With("component", "service"), svc)
 	}
@@ -89,22 +96,24 @@ func Setup(c *setup.Controller) (middleware.Middleware, error) {
 	}
 
 	// caddy middleware
-	var m middleware.Middleware
+	var m httpserver.Middleware
 	{
-		m = func(next middleware.Handler) middleware.Handler {
+		m = func(next httpserver.Handler) httpserver.Handler {
 			scp.next = next
 			scp.scepHandler = h
 			return scp
 		}
 	}
-
-	return m, nil
+	cfg := httpserver.GetConfig(c.Key)
+	cfg.AddMiddleware(m)
+	return nil
 }
 
-func parse(c *setup.Controller) (*SCEP, error) {
+func parse(c *caddy.Controller) (*SCEP, error) {
 	var (
 		config *SCEP
 		err    error
+		cfg    = httpserver.GetConfig(c.Key)
 	)
 
 	for c.Next() {
@@ -123,7 +132,7 @@ func parse(c *setup.Controller) (*SCEP, error) {
 				if !c.NextArg() {
 					return nil, c.ArgErr()
 				}
-				config.depotPath = filepath.Clean(c.Root + string(filepath.Separator) + c.Val())
+				config.depotPath = filepath.Clean(cfg.Root + string(filepath.Separator) + c.Val())
 			case "keypass":
 				if !c.NextArg() {
 					return nil, c.ArgErr()
