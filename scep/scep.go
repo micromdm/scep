@@ -274,7 +274,10 @@ func parseChallengePassword(asn1Data []byte) (string, error) {
 			return "", err
 		}
 		if attr.ID.Equal(oidChallengePassword) {
-			password = string(attr.Value.Bytes)
+			_, err := asn1.Unmarshal(attr.Value.Bytes, &password)
+			if err != nil {
+				return "", err
+			}
 		}
 	}
 
