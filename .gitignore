@@ -2,3 +2,4 @@
 cmd/scepserver/scepserver
 cmd/scepclient/scepclient
 build/
+vendor/
