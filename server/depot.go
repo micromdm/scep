@@ -145,8 +145,7 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 
 	file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR | os.O_APPEND, dbPerm)
 	if err != nil {
-		fmt.Errorf("could not append to "+name+" : %q\n", err.Error())
-		return err
+		return fmt.Errorf("could not append to "+name+" : %q\n", err.Error())
 	}
 	defer file.Close()
 
