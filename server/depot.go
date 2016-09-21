@@ -5,6 +5,11 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+    "bufio"
+    "io"
+    "strings"
+    "fmt"
+    "bytes"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -14,7 +19,7 @@ import (
 // Depot is a repository for managing certificates
 type Depot interface {
 	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
-	Put(name string, cert []byte) error
+	Put(name string, crt *x509.Certificate) error
 	Serial() (*big.Int, error)
 }
 
@@ -51,13 +56,18 @@ func (d fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 const (
 	certPerm   = 0444
 	serialPerm = 0400
+	dbPerm = 0600
 )
 
 // Put adds a certificate to the depot
-func (d fileDepot) Put(name string, data []byte) error {
-	if data == nil {
+func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
+	if crt == nil {
+		return errors.New("crt is nil")
+	}
+	if crt.Raw == nil {
 		return errors.New("data is nil")
 	}
+   data := crt.Raw;
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
 		return err
@@ -68,7 +78,7 @@ func (d fileDepot) Put(name string, data []byte) error {
 		return err
 	}
 
-	name = d.path(name) + "." + serial.String() + ".pem"
+	name := d.path(cn) + "." + serial.String() + ".pem"
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, certPerm)
 	if err != nil {
 		return err
@@ -85,6 +95,10 @@ func (d fileDepot) Put(name string, data []byte) error {
 		return err
 	}
 
+	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -98,13 +112,92 @@ func (d fileDepot) Serial() (*big.Int, error) {
 		}
 		return s, nil
 	}
-	data, err := ioutil.ReadFile(name)
-	if err != nil {
+    file, err := os.Open(name)
+    if err != nil {
+		return nil, err
+    }
+    defer file.Close()
+    r := bufio.NewReader(file)
+    // is there a better way??
+    data, err := r.ReadString('\r')
+    data = strings.TrimSuffix(data ,"\r")
+    data = strings.TrimSuffix(data ,"\n")
+	if err != nil && err != io.EOF {
 		return nil, err
 	}
-	serial := s.SetBytes(data)
+	serial, success := s.SetString(data,16)
+	if success != true  {
+		return nil, errors.New("Could not convert "+string(data)+" to serial number")
+	}
 	return serial, nil
 }
+
+func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
+
+    var dn bytes.Buffer
+    var dbEntry bytes.Buffer
+
+	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
+		return err
+	}
+	name := d.path("index.txt")
+
+    issuer := cert.Issuer
+
+	file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR | os.O_APPEND, dbPerm)
+	if err != nil {
+        fmt.Printf("Could not append to "+name+" : %q\n", err.Error())
+        return err
+	}
+	defer file.Close()
+
+    // Format of the caDB, see http://pki-tutorial.readthedocs.io/en/latest/cadb.html
+    //   STATUSFLAG  EXPIRATIONDATE  REVOCATIONDATE(or emtpy)    SERIAL_IN_HEX   CERTFILENAME_OR_'unknown'   Certificate_DN
+
+    serialHex  := fmt.Sprintf("%x", cert.SerialNumber)
+    t := cert.NotAfter
+    validDate := fmt.Sprintf("%d%02d%02d%02d%02d%02dZ", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
+
+    if len(issuer.Country) >0 {
+        dn.WriteString("/C=" + issuer.Country[0])
+    }
+    if len(issuer.Province) >0 {
+        dn.WriteString("/ST=" + issuer.Province[0])
+    }
+    if len(issuer.Locality) >0 {
+        dn.WriteString("/L=" + issuer.Locality[0])
+    }
+    if len(issuer.Organization) >0 {
+        dn.WriteString("/O=" + issuer.Organization[0])
+    }
+    if len(issuer.OrganizationalUnit) >0 {
+        dn.WriteString("/OU=" + issuer.OrganizationalUnit[0])
+    }
+    dn.WriteString("/CN="+cn)
+    if len(cert.EmailAddresses) >0 {
+        dn.WriteString("/emailAddress=" + cert.EmailAddresses[0])
+    }
+    // Valid
+    dbEntry.WriteString("V\t")
+    // Valid till
+    dbEntry.WriteString(validDate+"\t")
+    // Emptry (not revoked)
+    dbEntry.WriteString("\t")
+    // Serial in Hex
+    dbEntry.WriteString(serialHex+"\t")
+    // Certificate file name
+    dbEntry.WriteString("\t"+filename+"\t")
+    // Certificate DN
+    dbEntry.Write(dn.Bytes());
+    dbEntry.WriteString("\n")
+
+	if _, err := file.Write(dbEntry.Bytes()); err != nil {
+		file.Close()
+		return err
+	}
+	return nil
+}
+
 
 func (d fileDepot) writeSerial(serial *big.Int) error {
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
@@ -119,7 +212,7 @@ func (d fileDepot) writeSerial(serial *big.Int) error {
 	}
 	defer file.Close()
 
-	if _, err := file.Write(serial.Bytes()); err != nil {
+	if _, err := file.WriteString(fmt.Sprintf("%x\n",serial.Bytes())); err != nil {
 		file.Close()
 		os.Remove(name)
 		return err

@@ -9,9 +9,7 @@ import (
 	"errors"
 	"math/big"
 	"time"
-
 	"github.com/micromdm/scep/scep"
-
 	"golang.org/x/net/context"
 )
 
@@ -43,6 +41,7 @@ type service struct {
 	caKeyPassword     []byte
 	csrTemplate       *x509.Certificate
 	challengePassword string
+    clientValidity    int       // client cert validity in days
 }
 
 func (svc service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -91,12 +90,14 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 		return nil, err
 	}
 
+    duration := svc.clientValidity
+    
 	// create cert template
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject:      csr.Subject,
 		NotBefore:    time.Now().Add(-600).UTC(),
-		NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
+		NotAfter:     time.Now().AddDate(0, 0, duration).UTC(),
 		SubjectKeyId: id,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
 		ExtKeyUsage: []x509.ExtKeyUsage{
@@ -111,7 +112,7 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 
 	crt := certRep.CertRepMessage.Certificate
 	name := certName(crt)
-	if err := svc.depot.Put(name, crt.Raw); err != nil {
+	if err := svc.depot.Put(name, crt); err != nil {
 		return nil, err
 	}
 
@@ -158,6 +159,14 @@ func ChallengePassword(pw string) ServiceOption {
 func CAKeyPassword(pw []byte) ServiceOption {
 	return func(s *service) error {
 		s.caKeyPassword = pw
+		return nil
+	}
+}
+
+// optional argument to set the validity of signed client certs in days
+func ClientValidity(duration int) ServiceOption {
+	return func(s *service) error {
+		s.clientValidity = duration
 		return nil
 	}
 }
