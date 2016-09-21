@@ -118,16 +118,15 @@ func (d fileDepot) Serial() (*big.Int, error) {
 	}
 	defer file.Close()
 	r := bufio.NewReader(file)
-	// is there a better way??
 	data, err := r.ReadString('\r')
-	data = strings.TrimSuffix(data ,"\r")
-	data = strings.TrimSuffix(data ,"\n")
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
-	serial, success := s.SetString(data,16)
-	if success != true  {
-		return nil, errors.New("Could not convert "+string(data)+" to serial number")
+	data = strings.TrimSuffix(data ,"\r")
+	data = strings.TrimSuffix(data ,"\n")
+	serial, ok := s.SetString(data,16)
+	if !ok {
+		return nil, errors.New("could not convert "+string(data)+" to serial number")
 	}
 	return serial, nil
 }
@@ -146,7 +145,7 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 
 	file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR | os.O_APPEND, dbPerm)
 	if err != nil {
-		fmt.Printf("Could not append to "+name+" : %q\n", err.Error())
+		fmt.Errorf("could not append to "+name+" : %q\n", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -192,7 +191,6 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	dbEntry.WriteString("\n")
 
 	if _, err := file.Write(dbEntry.Bytes()); err != nil {
-		file.Close()
 		return err
 	}
 	return nil
