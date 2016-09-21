@@ -95,7 +95,7 @@ func main() {
 		svcOptions := []scepserver.ServiceOption{
 			scepserver.ChallengePassword(*flChallengePassword),
 			scepserver.CAKeyPassword([]byte(*flCAPass)),
-		    scepserver.ClientValidity(clientValidity),
+			scepserver.ClientValidity(clientValidity),
 		}
 		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
