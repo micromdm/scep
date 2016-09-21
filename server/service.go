@@ -9,9 +9,7 @@ import (
 	"errors"
 	"math/big"
 	"time"
-
 	"github.com/micromdm/scep/scep"
-
 	"golang.org/x/net/context"
 )
 
@@ -111,7 +109,7 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 
 	crt := certRep.CertRepMessage.Certificate
 	name := certName(crt)
-	if err := svc.depot.Put(name, crt.Raw); err != nil {
+	if err := svc.depot.Put(name, crt); err != nil {
 		return nil, err
 	}
 

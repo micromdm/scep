@@ -46,6 +46,7 @@ func main() {
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
+		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 	)
 	flag.Usage = func() {
@@ -87,6 +88,7 @@ func main() {
 	{
 		svcOptions := []scepserver.ServiceOption{
 			scepserver.ChallengePassword(*flChallengePassword),
+			scepserver.CAKeyPassword([]byte(*flCAPass)),
 		}
 		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
