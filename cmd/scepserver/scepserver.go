@@ -10,7 +10,7 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
-    "strconv"
+	"strconv"
 	"flag"
 	"fmt"
 	"math/big"
@@ -19,7 +19,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
 	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/server"
 	"golang.org/x/net/context"
