@@ -10,6 +10,7 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
+	"strconv"
 	"flag"
 	"fmt"
 	"math/big"
@@ -18,7 +19,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-
 	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/server"
 	"golang.org/x/net/context"
@@ -46,6 +46,9 @@ func main() {
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
+        //  TODO : how to submit non string passwords?
+		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
+		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 	)
 	flag.Usage = func() {
@@ -83,10 +86,17 @@ func main() {
 		}
 	}
 
+    clientValidity, err := strconv.Atoi(*flClDuration)
+    if err != nil {
+			logger.Log("No valid number for client cert validity : ", err)
+			os.Exit(1)
+    }
 	var svc scepserver.Service // scep service
 	{
 		svcOptions := []scepserver.ServiceOption{
 			scepserver.ChallengePassword(*flChallengePassword),
+			scepserver.CAKeyPassword([]byte(*flCAPass)),
+			scepserver.ClientValidity(clientValidity),
 		}
 		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
