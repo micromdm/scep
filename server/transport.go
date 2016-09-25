@@ -2,6 +2,7 @@ package scepserver
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -49,7 +50,8 @@ func EncodeSCEPRequest(ctx context.Context, r *http.Request, request interface{}
 	switch r.Method {
 	case "GET":
 		if len(req.Message) > 0 {
-			return errors.New("only POSTPKIOperation supported")
+			encMessage := base64.StdEncoding.EncodeToString(req.Message)
+			params.Set("message", encMessage)
 		}
 	case "POST":
 		var buf bytes.Buffer
