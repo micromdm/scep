@@ -100,6 +100,10 @@ func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
 		return err
 	}
 
+	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -195,7 +199,7 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	var dbEntry bytes.Buffer
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
-		return err
+            return err
 	}
 	name := d.path("index.txt")
 
