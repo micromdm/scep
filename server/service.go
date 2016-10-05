@@ -112,6 +112,13 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 
 	crt := certRep.CertRepMessage.Certificate
 	name := certName(crt)
+
+	// Test if this certificate name is already in the CADB
+	err = svc.depot.dbHasCn(name,crt)
+	if err != nil {
+	    return nil,err
+	}
+
 	if err := svc.depot.Put(name, crt); err != nil {
 		return nil, err
 	}

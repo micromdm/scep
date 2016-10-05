@@ -16,8 +16,8 @@ const (
 )
 
 type csrOptions struct {
-	cn, org, country, challenge string
-	key                         *rsa.PrivateKey
+	cn, org, country, ou, locality, province, challenge string 
+    key         *rsa.PrivateKey
 }
 
 func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, error) {
@@ -30,7 +30,7 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 	}
 	defer file.Close()
 
-	csrBytes, err := newCSR(opts.key, opts.country, opts.cn, opts.org)
+	csrBytes, err := newCSR(opts.key, opts.ou, opts.locality, opts.province, opts.country, opts.cn, opts.org)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +46,14 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 }
 
 // create a CSR using the same parameters as Keychain Access would produce
-func newCSR(priv *rsa.PrivateKey, country, cname, org string) ([]byte, error) {
+func newCSR(priv *rsa.PrivateKey, ou string, locality string, province string, country string, cname, org string) ([]byte, error) {
 	subj := pkix.Name{
-		Country:      []string{country},
 		CommonName:   cname,
+		Country:      []string{country},
 		Organization: []string{org},
+		Locality: []string{locality},
+		OrganizationalUnit: []string{ou},
+		Province: []string{province},
 	}
 	template := &x509.CertificateRequest{
 		Subject: subj,

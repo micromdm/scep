@@ -8,11 +8,10 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"unicode"
 	"path/filepath"
 	"strings"
-
 	"golang.org/x/net/context"
-
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
 )
@@ -32,9 +31,23 @@ type runCfg struct {
 	certPath     string
 	cn           string
 	org          string
+	ou           string
+	locality     string
+	province     string
 	country      string
 	challenge    string
 	serverURL    string
+}
+
+func isAsciiPrintableTo(s string) int {
+	count := 0
+	for _, r := range s {
+		count = count + 1
+		if r > unicode.MaxLatin1 || !unicode.IsPrint(r) {
+			return count
+		}
+	}
+	return count
 }
 
 func run(cfg runCfg) error {
@@ -47,6 +60,9 @@ func run(cfg runCfg) error {
 		cn:        cfg.cn,
 		org:       cfg.org,
 		country:   strings.ToUpper(cfg.country),
+		ou:        cfg.ou,
+		locality:  cfg.locality,
+		province:  cfg.province,
 		challenge: cfg.challenge,
 		key:       key,
 	}
@@ -137,14 +153,14 @@ func run(cfg runCfg) error {
 
 	respBytes, err := client.PKIOperation(ctx, msg.Raw)
 	if err != nil {
-		return err
+        return fmt.Errorf("Error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
 	}
 	respMsg, err := scep.ParsePKIMessage(respBytes)
 	if err != nil {
-		return err
+        return fmt.Errorf("Error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
 	}
 	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
-		fmt.Println(err)
+        fmt.Println("Error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
 		os.Exit(1)
 	}
 
@@ -188,6 +204,9 @@ func main() {
 		flKeySize           = flag.Int("keySize", 2048, "rsa key size")
 		flOrg               = flag.String("organization", "scep-client", "organization for cert")
 		flCName             = flag.String("cn", "scepclient", "common name for certificate")
+		flOU                = flag.String("ou", "MDM", "organizational unit for certificate")
+		flLoc               = flag.String("locality", "", "locality for certificate")
+		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
 	)
 	flag.Parse()
@@ -221,12 +240,15 @@ func main() {
 		cn:           *flCName,
 		org:          *flOrg,
 		country:      *flCountry,
+		locality:     *flLoc,
+		ou:           *flOU,
+		province:     *flProvince,
 		challenge:    *flChallengePassword,
 		serverURL:    *flServerURL,
 	}
 
 	if err := run(cfg); err != nil {
-		fmt.Println(err)
+        fmt.Println(err)
 		os.Exit(1)
 	}
 }
