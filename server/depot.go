@@ -92,11 +92,11 @@ func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
 		return err
 	}
 
-	if err := d.incrementSerial(serial); err != nil {
+	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
 		return err
 	}
 
-	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
+	if err := d.incrementSerial(serial); err != nil {
 		return err
 	}
 
@@ -135,19 +135,19 @@ func (d fileDepot) Serial() (*big.Int, error) {
 func makeDn(cert *x509.Certificate) string {
 	var dn bytes.Buffer
 	
-	if len(cert.Subject.Country) >0 {
+	if len(cert.Subject.Country) >0 && len(cert.Subject.Country[0]) > 0 {
 		dn.WriteString("/C=" + cert.Subject.Country[0])
 	}
-	if len(cert.Subject.Province) >0 {
+	if len(cert.Subject.Province) > 0 && len(cert.Subject.Province[0]) > 0 {
 		dn.WriteString("/ST=" + cert.Subject.Province[0])
 	}
-	if len(cert.Subject.Locality) >0 {
+	if len(cert.Subject.Locality) >0 && len(cert.Subject.Locality[0]) > 0 {
 		dn.WriteString("/L=" + cert.Subject.Locality[0])
 	}
-	if len(cert.Subject.Organization) >0 {
+	if len(cert.Subject.Organization) >0 && len(cert.Subject.Organization[0]) > 0 {
 		dn.WriteString("/O=" + cert.Subject.Organization[0])
 	}
-	if len(cert.Subject.OrganizationalUnit) >0 {
+	if len(cert.Subject.OrganizationalUnit) >0 && len(cert.Subject.OrganizationalUnit[0]) > 0 {
 		dn.WriteString("/OU=" + cert.Subject.OrganizationalUnit[0])
 	}
 	if len(cert.Subject.CommonName) >0 {
