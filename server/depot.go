@@ -21,6 +21,7 @@ type Depot interface {
 	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 	Put(name string, crt *x509.Certificate) error
 	Serial() (*big.Int, error)
+    dbHasCn(cn string, cert *x509.Certificate) error
 }
 
 // NewFileDepot returns a new cert depot
@@ -131,17 +132,72 @@ func (d fileDepot) Serial() (*big.Int, error) {
 	return serial, nil
 }
 
+func makeDn(cert *x509.Certificate) string {
+    var dn bytes.Buffer
+
+    if len(cert.Subject.Country) >0 {
+        dn.WriteString("/C=" + cert.Subject.Country[0])
+    }
+    if len(cert.Subject.Province) >0 {
+        dn.WriteString("/ST=" + cert.Subject.Province[0])
+    }
+    if len(cert.Subject.Locality) >0 {
+        dn.WriteString("/L=" + cert.Subject.Locality[0])
+    }
+    if len(cert.Subject.Organization) >0 {
+        dn.WriteString("/O=" + cert.Subject.Organization[0])
+    }
+    if len(cert.Subject.OrganizationalUnit) >0 {
+        dn.WriteString("/OU=" + cert.Subject.OrganizationalUnit[0])
+    }
+    if len(cert.Subject.CommonName) >0 {
+        dn.WriteString("/CN="+cert.Subject.CommonName)
+    }
+    if len(cert.EmailAddresses) >0 {
+        dn.WriteString("/emailAddress=" + cert.EmailAddresses[0])
+    }
+    return dn.String();
+}
+
+// Determine if the cadb already has a valid certificate with the same name
+func (d fileDepot) dbHasCn(cn string, cert *x509.Certificate) error {
+	
+    dn := makeDn(cert)
+
+	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
+		return err
+	}
+	name := d.path("index.txt")
+    file, err := os.Open(name)
+    if err != nil {
+        return err
+    }
+    defer file.Close()
+
+    scanner := bufio.NewScanner(file)
+    for scanner.Scan() {
+        if(strings.HasSuffix(scanner.Text(), dn)){
+            // Determine if DN starts with V (valid)
+            if(strings.HasPrefix(scanner.Text(), "V\t")){
+                return errors.New("DN "+dn+" already exists");
+            }
+        }
+    }
+
+    if err := scanner.Err(); err != nil {
+        return err
+    }  
+    return nil
+}
+
 func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
 
-	var dn bytes.Buffer
 	var dbEntry bytes.Buffer
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
 		return err
 	}
 	name := d.path("index.txt")
-
-	issuer := cert.Issuer
 
 	file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR | os.O_APPEND, dbPerm)
 	if err != nil {
@@ -155,27 +211,11 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 
 	serialHex  := fmt.Sprintf("%x", cert.SerialNumber)
 	t := cert.NotAfter
-	validDate := fmt.Sprintf("%d%02d%02dT%02d%02d%02dZ", t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
+    y := (int(t.Year()) % 100)
+	validDate := fmt.Sprintf("%02d%02d%02d%02d%02d%02dZ", y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
 
-	if len(issuer.Country) >0 {
-		dn.WriteString("/C=" + issuer.Country[0])
-	}
-	if len(issuer.Province) >0 {
-		dn.WriteString("/ST=" + issuer.Province[0])
-	}
-	if len(issuer.Locality) >0 {
-		dn.WriteString("/L=" + issuer.Locality[0])
-	}
-	if len(issuer.Organization) >0 {
-		dn.WriteString("/O=" + issuer.Organization[0])
-	}
-	if len(issuer.OrganizationalUnit) >0 {
-		dn.WriteString("/OU=" + issuer.OrganizationalUnit[0])
-	}
-	dn.WriteString("/CN="+cn)
-	if len(cert.EmailAddresses) >0 {
-		dn.WriteString("/emailAddress=" + cert.EmailAddresses[0])
-	}
+    dn := makeDn(cert)
+
 	// Valid
 	dbEntry.WriteString("V\t")
 	// Valid till
@@ -185,9 +225,9 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	// Serial in Hex
 	dbEntry.WriteString(serialHex+"\t")
 	// Certificate file name
-	dbEntry.WriteString("\t"+filename+"\t")
+	dbEntry.WriteString(filename+"\t")
 	// Certificate DN
-	dbEntry.Write(dn.Bytes());
+	dbEntry.WriteString(dn);
 	dbEntry.WriteString("\n")
 
 	if _, err := file.Write(dbEntry.Bytes()); err != nil {
