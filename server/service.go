@@ -170,7 +170,7 @@ func CAKeyPassword(pw []byte) ServiceOption {
 	}
 }
 
-// optional argument to set the validity of signed client certs in days
+// ClientValidity sets the validity of signed client certs in days (optional parameter)
 func ClientValidity(duration int) ServiceOption {
 	return func(s *service) error {
 		s.clientValidity = duration
