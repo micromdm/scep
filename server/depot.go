@@ -21,7 +21,7 @@ type Depot interface {
 	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 	Put(name string, crt *x509.Certificate) error
 	Serial() (*big.Int, error)
-    dbHasCn(cn string, cert *x509.Certificate) error
+	dbHasCn(cn string, cert *x509.Certificate) error
 }
 
 // NewFileDepot returns a new cert depot
@@ -133,61 +133,61 @@ func (d fileDepot) Serial() (*big.Int, error) {
 }
 
 func makeDn(cert *x509.Certificate) string {
-    var dn bytes.Buffer
-
-    if len(cert.Subject.Country) >0 {
-        dn.WriteString("/C=" + cert.Subject.Country[0])
-    }
-    if len(cert.Subject.Province) >0 {
-        dn.WriteString("/ST=" + cert.Subject.Province[0])
-    }
-    if len(cert.Subject.Locality) >0 {
-        dn.WriteString("/L=" + cert.Subject.Locality[0])
-    }
-    if len(cert.Subject.Organization) >0 {
-        dn.WriteString("/O=" + cert.Subject.Organization[0])
-    }
-    if len(cert.Subject.OrganizationalUnit) >0 {
-        dn.WriteString("/OU=" + cert.Subject.OrganizationalUnit[0])
-    }
-    if len(cert.Subject.CommonName) >0 {
-        dn.WriteString("/CN="+cert.Subject.CommonName)
-    }
-    if len(cert.EmailAddresses) >0 {
-        dn.WriteString("/emailAddress=" + cert.EmailAddresses[0])
-    }
-    return dn.String();
+	var dn bytes.Buffer
+	
+	if len(cert.Subject.Country) >0 {
+		dn.WriteString("/C=" + cert.Subject.Country[0])
+	}
+	if len(cert.Subject.Province) >0 {
+		dn.WriteString("/ST=" + cert.Subject.Province[0])
+	}
+	if len(cert.Subject.Locality) >0 {
+		dn.WriteString("/L=" + cert.Subject.Locality[0])
+	}
+	if len(cert.Subject.Organization) >0 {
+		dn.WriteString("/O=" + cert.Subject.Organization[0])
+	}
+	if len(cert.Subject.OrganizationalUnit) >0 {
+		dn.WriteString("/OU=" + cert.Subject.OrganizationalUnit[0])
+	}
+	if len(cert.Subject.CommonName) >0 {
+		dn.WriteString("/CN="+cert.Subject.CommonName)
+	}
+	if len(cert.EmailAddresses) >0 {
+		dn.WriteString("/emailAddress=" + cert.EmailAddresses[0])
+	}
+	return dn.String();
 }
 
 // Determine if the cadb already has a valid certificate with the same name
 func (d fileDepot) dbHasCn(cn string, cert *x509.Certificate) error {
 	
-    dn := makeDn(cert)
+	dn := makeDn(cert)
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
 		return err
 	}
 	name := d.path("index.txt")
-    file, err := os.Open(name)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
+	file, err := os.Open(name)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
 
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        if(strings.HasSuffix(scanner.Text(), dn)){
-            // Determine if DN starts with V (valid)
-            if(strings.HasPrefix(scanner.Text(), "V\t")){
-                return errors.New("DN "+dn+" already exists");
-            }
-        }
-    }
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		if(strings.HasSuffix(scanner.Text(), dn)){
+			// Determine if DN starts with V (valid)
+			if(strings.HasPrefix(scanner.Text(), "V\t")){
+				return errors.New("DN "+dn+" already exists");
+			}
+		}
+	}
 
-    if err := scanner.Err(); err != nil {
-        return err
-    }  
-    return nil
+	if err := scanner.Err(); err != nil {
+		return err
+	}  
+	return nil
 }
 
 func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
@@ -210,10 +210,10 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 
 	serialHex  := fmt.Sprintf("%x", cert.SerialNumber)
 	t := cert.NotAfter
-    y := (int(t.Year()) % 100)
+	y := (int(t.Year()) % 100)
 	validDate := fmt.Sprintf("%02d%02d%02d%02d%02d%02dZ", y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
 
-    dn := makeDn(cert)
+	dn := makeDn(cert)
 
 	// Valid
 	dbEntry.WriteString("V\t")
@@ -316,7 +316,6 @@ func loadKey(data []byte, password []byte) (*rsa.PrivateKey, error) {
 		return nil, err
 	}
 	return x509.ParsePKCS1PrivateKey(b)
-
 }
 
 // load an encrypted private key from disk

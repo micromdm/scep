@@ -86,11 +86,11 @@ func main() {
 		}
 	}
 
-    clientValidity, err := strconv.Atoi(*flClDuration)
-    if err != nil {
+	clientValidity, err := strconv.Atoi(*flClDuration)
+	if err != nil {
 			logger.Log("No valid number for client cert validity : ", err)
 			os.Exit(1)
-    }
+	}
 	var svc scepserver.Service // scep service
 	{
 		svcOptions := []scepserver.ServiceOption{
