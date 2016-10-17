@@ -13,6 +13,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"os"
+	"time"
+	"strconv"
 	"path/filepath"
 )
 
@@ -21,7 +23,7 @@ type Depot interface {
 	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 	Put(name string, crt *x509.Certificate) error
 	Serial() (*big.Int, error)
-	dbHasCn(cn string, cert *x509.Certificate) error
+	dbHasCn(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error
 }
 
 // NewFileDepot returns a new cert depot
@@ -91,16 +93,12 @@ func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
 		os.Remove(name)
 		return err
 	}
-
 	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
+		// TODO : remove certificate in case of writeDB problems
 		return err
 	}
 
 	if err := d.incrementSerial(serial); err != nil {
-		return err
-	}
-
-	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
 		return err
 	}
 
@@ -136,6 +134,12 @@ func (d fileDepot) Serial() (*big.Int, error) {
 	return serial, nil
 }
 
+func makeOpenSSLTime(t time.Time) string {
+	y := (int(t.Year()) % 100)
+	validDate := fmt.Sprintf("%02d%02d%02d%02d%02d%02dZ", y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
+	return validDate
+}
+
 func makeDn(cert *x509.Certificate) string {
 	var dn bytes.Buffer
 	
@@ -164,33 +168,86 @@ func makeDn(cert *x509.Certificate) string {
 }
 
 // Determine if the cadb already has a valid certificate with the same name
-func (d fileDepot) dbHasCn(cn string, cert *x509.Certificate) error {
-	
+func (d fileDepot) dbHasCn(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error {
+
+	var addDB bytes.Buffer
+	var candidates map[string]string
+	candidates = make(map[string]string)
+
 	dn := makeDn(cert)
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
 		return err
 	}
+
 	name := d.path("index.txt")
 	file, err := os.Open(name)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
 
+	// Loop over index.txt, determine if a certificate is valid and can be revoked
+	// revoke certificate in DB if requested
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		if(strings.HasSuffix(scanner.Text(), dn)){
-			// Determine if DN starts with V (valid)
-			if(strings.HasPrefix(scanner.Text(), "V\t")){
-				return errors.New("DN "+dn+" already exists");
+		line := scanner.Text()
+		if(strings.HasSuffix(line, dn)){
+			// Removing revoked certificate from candidates, if any
+			if(strings.HasPrefix(line, "R\t")){
+				entries := strings.Split(line,"\t")
+				serial := strings.ToUpper(entries[3])
+				candidates[serial] = line
+				delete(candidates,serial)
+				addDB.WriteString(line+"\n");
+			// Test & add certificate candidates, if any
+			} else if(strings.HasPrefix(line, "V\t")){
+				issueDate, err := strconv.Atoi(strings.Replace(strings.Split(line,"\t")[1],"Z","",1))
+				if err != nil {
+				file.Close()
+					return errors.New("Could not get expiry date from ca db")
+				}
+				minimalRenewDate, err := strconv.Atoi(strings.Replace(makeOpenSSLTime(time.Now().AddDate(0, 0, allowTime).UTC()),"Z","",1))
+				if err != nil {
+					file.Close()
+					return errors.New("Could not calculate expiry date")
+				}
+				entries := strings.Split(line,"\t")
+				serial := strings.ToUpper(entries[3])
+			
+				// all non renewable certificates
+				if(minimalRenewDate < issueDate && allowTime > 0){
+					candidates[serial] = "no"
+				} else {
+					candidates[serial] = line
+				}
 			}
+		} else {
+			addDB.WriteString(line+"\n");
 		}
 	}
-
+	file.Close()
+	for key, value := range candidates {
+		if value == "no" {
+			return errors.New("DN "+dn+" already exists")
+			}
+		if revokeOldCertificate {
+			fmt.Println("Revoking certificate with serial "+key+" from DB. Recreation of CRL needed.")
+			entries := strings.Split(value,"\t")
+			addDB.WriteString("R\t"+entries[1]+"\t"+makeOpenSSLTime(time.Now())+"\t"+strings.ToUpper(entries[3])+"\t"+entries[4]+"\t"+entries[5]+"\n")
+		}
+	}
 	if err := scanner.Err(); err != nil {
 		return err
 	}  
+	if revokeOldCertificate {
+		file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR, dbPerm)
+		if err != nil {
+			return err
+		}
+		if _, err := file.Write(addDB.Bytes()); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -198,8 +255,12 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 
 	var dbEntry bytes.Buffer
 
+	// Revoke old certificate
+	if err := d.dbHasCn(cn, 0, cert, true); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
-            return err
+		return err
 	}
 	name := d.path("index.txt")
 
@@ -212,10 +273,9 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	// Format of the caDB, see http://pki-tutorial.readthedocs.io/en/latest/cadb.html
 	//   STATUSFLAG  EXPIRATIONDATE  REVOCATIONDATE(or emtpy)	SERIAL_IN_HEX   CERTFILENAME_OR_'unknown'   Certificate_DN
 
-	serialHex  := fmt.Sprintf("%x", cert.SerialNumber)
-	t := cert.NotAfter
-	y := (int(t.Year()) % 100)
-	validDate := fmt.Sprintf("%02d%02d%02d%02d%02d%02dZ", y, t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
+	serialHex  := strings.ToUpper(fmt.Sprintf("%x", cert.SerialNumber))
+
+	validDate := makeOpenSSLTime(cert.NotAfter);
 
 	dn := makeDn(cert)
 
@@ -223,7 +283,7 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	dbEntry.WriteString("V\t")
 	// Valid till
 	dbEntry.WriteString(validDate+"\t")
-	// Emptry (not revoked)
+	// Empty (not revoked)
 	dbEntry.WriteString("\t")
 	// Serial in Hex
 	dbEntry.WriteString(serialHex+"\t")

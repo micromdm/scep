@@ -46,9 +46,10 @@ func main() {
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
-        //  TODO : how to submit non string passwords?
+		//  TODO : how to submit non string passwords?
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
+		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 	)
 	flag.Usage = func() {
@@ -85,11 +86,15 @@ func main() {
 			os.Exit(1)
 		}
 	}
-
+	allowRenewal, err := strconv.Atoi(*flClAllowRenewal)
+	if err != nil {
+		logger.Log("No valid number for allowed renewal time : ", err)
+		os.Exit(1)
+	}
 	clientValidity, err := strconv.Atoi(*flClDuration)
 	if err != nil {
-			logger.Log("No valid number for client cert validity : ", err)
-			os.Exit(1)
+		logger.Log("No valid number for client cert validity : ", err)
+		os.Exit(1)
 	}
 	var svc scepserver.Service // scep service
 	{
@@ -97,6 +102,7 @@ func main() {
 			scepserver.ChallengePassword(*flChallengePassword),
 			scepserver.CAKeyPassword([]byte(*flCAPass)),
 			scepserver.ClientValidity(clientValidity),
+			scepserver.AllowRenewal(allowRenewal),
 		}
 		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
