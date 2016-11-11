@@ -12,9 +12,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/go-kit/kit/log"
-	"github.com/micromdm/scep/server"
-	"golang.org/x/net/context"
 	"math/big"
 	"net/http"
 	"os"
@@ -22,6 +19,12 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/go-kit/kit/log"
+	"github.com/micromdm/scep/depot"
+	"github.com/micromdm/scep/depot/file"
+	"github.com/micromdm/scep/server"
+	"golang.org/x/net/context"
 )
 
 // version info
@@ -78,9 +81,9 @@ func main() {
 	}
 
 	var err error
-	var depot scepserver.Depot // cert storage
+	var depot depot.Depot // cert storage
 	{
-		depot, err = scepserver.NewFileDepot(*flDepotPath)
+		depot, err = file.NewFileDepot(*flDepotPath)
 		if err != nil {
 			logger.Log("err", err)
 			os.Exit(1)
