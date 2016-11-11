@@ -104,10 +104,11 @@ func (db *Depot) Serial() (*big.Int, error) {
 			return fmt.Errorf("bucket %q not found!", certBucket)
 		}
 		k := bucket.Get([]byte("serial"))
-		if k != nil {
-			s = s.SetBytes(k)
+		if k == nil {
+			return fmt.Errorf("key %q not found", "serial")
 		}
-		return fmt.Errorf("key %q not found", "serial")
+		s = s.SetBytes(k)
+		return nil
 	})
 	if err != nil {
 		return nil, err
