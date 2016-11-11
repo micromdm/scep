@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
 	"golang.org/x/net/context"
 )
@@ -36,7 +37,7 @@ type Service interface {
 }
 
 type service struct {
-	depot             Depot
+	depot             depot.Depot
 	ca                []*x509.Certificate // CA cert or chain
 	caKey             *rsa.PrivateKey
 	caKeyPassword     []byte
@@ -118,7 +119,7 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 	// Test if this certificate is already in the CADB, revoke if needed
 	// revocation is done if the validity of the existing certificate is
 	// less than allowRenewal (14 days by default)
-	err = svc.depot.dbHasCn(name, svc.allowRenewal, crt, false)
+	err = svc.depot.HasCN(name, svc.allowRenewal, crt, false)
 	if err != nil {
 		return nil, err
 	}
@@ -191,7 +192,7 @@ func ClientValidity(duration int) ServiceOption {
 }
 
 // NewService creates a new scep service
-func NewService(depot Depot, opts ...ServiceOption) (Service, error) {
+func NewService(depot depot.Depot, opts ...ServiceOption) (Service, error) {
 	s := &service{
 		depot: depot,
 	}

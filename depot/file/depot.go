@@ -1,4 +1,4 @@
-package scepserver
+package file
 
 import (
 	"bufio"
@@ -18,30 +18,22 @@ import (
 	"time"
 )
 
-// Depot is a repository for managing certificates
-type Depot interface {
-	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
-	Put(name string, crt *x509.Certificate) error
-	Serial() (*big.Int, error)
-	dbHasCn(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error
-}
-
-// NewFileDepot returns a new cert depot
-func NewFileDepot(path string) (Depot, error) {
+// NewFileDepot returns a new cert depot.
+func NewFileDepot(path string) (*fileDepot, error) {
 	f, err := os.OpenFile(fmt.Sprintf("%s/index.txt", path),
 		os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return fileDepot{dirPath: path}, nil
+	return &fileDepot{dirPath: path}, nil
 }
 
 type fileDepot struct {
 	dirPath string
 }
 
-func (d fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
+func (d *fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
 	caPEM, err := d.getFile("ca.pem")
 	if err != nil {
 		return nil, nil, err
@@ -69,7 +61,7 @@ const (
 )
 
 // Put adds a certificate to the depot
-func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
+func (d *fileDepot) Put(cn string, crt *x509.Certificate) error {
 	if crt == nil {
 		return errors.New("crt is nil")
 	}
@@ -110,7 +102,7 @@ func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
 	return nil
 }
 
-func (d fileDepot) Serial() (*big.Int, error) {
+func (d *fileDepot) Serial() (*big.Int, error) {
 	name := d.path("serial")
 	s := big.NewInt(2)
 	if err := d.check("serial"); err != nil {
@@ -173,7 +165,7 @@ func makeDn(cert *x509.Certificate) string {
 }
 
 // Determine if the cadb already has a valid certificate with the same name
-func (d fileDepot) dbHasCn(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error {
+func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error {
 
 	var addDB bytes.Buffer
 	var candidates map[string]string
@@ -255,12 +247,12 @@ func (d fileDepot) dbHasCn(cn string, allowTime int, cert *x509.Certificate, rev
 	return nil
 }
 
-func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
+func (d *fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
 
 	var dbEntry bytes.Buffer
 
 	// Revoke old certificate
-	if err := d.dbHasCn(cn, 0, cert, true); err != nil {
+	if err := d.HasCN(cn, 0, cert, true); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
@@ -303,7 +295,7 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	return nil
 }
 
-func (d fileDepot) writeSerial(serial *big.Int) error {
+func (d *fileDepot) writeSerial(serial *big.Int) error {
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
 		return err
 	}
@@ -317,7 +309,6 @@ func (d fileDepot) writeSerial(serial *big.Int) error {
 	defer file.Close()
 
 	if _, err := file.WriteString(fmt.Sprintf("%x\n", serial.Bytes())); err != nil {
-		file.Close()
 		os.Remove(name)
 		return err
 	}
@@ -325,7 +316,7 @@ func (d fileDepot) writeSerial(serial *big.Int) error {
 }
 
 // read serial and increment
-func (d fileDepot) incrementSerial(s *big.Int) error {
+func (d *fileDepot) incrementSerial(s *big.Int) error {
 	serial := s.Add(s, big.NewInt(1))
 	if err := d.writeSerial(serial); err != nil {
 		return err
