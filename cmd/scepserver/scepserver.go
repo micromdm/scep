@@ -10,18 +10,18 @@ import (
 	"encoding/asn1"
 	"encoding/pem"
 	"errors"
-	"strconv"
 	"flag"
 	"fmt"
+	"github.com/go-kit/kit/log"
+	"github.com/micromdm/scep/server"
+	"golang.org/x/net/context"
 	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
-	"github.com/go-kit/kit/log"
-	"github.com/micromdm/scep/server"
-	"golang.org/x/net/context"
 )
 
 // version info
@@ -43,9 +43,9 @@ func main() {
 
 	//main flags
 	var (
-		flVersion           = flag.Bool("version", false, "prints version information")
-		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
-		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
+		flVersion   = flag.Bool("version", false, "prints version information")
+		flPort      = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
+		flDepotPath = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		//  TODO : how to submit non string passwords?
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
