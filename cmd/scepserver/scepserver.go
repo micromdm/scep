@@ -162,21 +162,12 @@ func caMain(cmd *flag.FlagSet) int {
 	return 0
 }
 
-// create a key, save it to depot and return it for further usage
+// create a key, save it to depot and return it for further usage.
 func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error) {
-	key, err := newRSAKey(bits)
-	if err != nil {
-		return nil, err
-	}
-	e, err := encryptedKey(key, password)
-	if err != nil {
-		return nil, err
-	}
-
+	// create depot folder if missing
 	if err := os.MkdirAll(depot, 0755); err != nil {
 		return nil, err
 	}
-
 	name := depot + "/" + "ca.key"
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
 	if err != nil {
@@ -184,8 +175,22 @@ func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error)
 	}
 	defer file.Close()
 
-	if _, err := file.Write(e); err != nil {
-		file.Close()
+	// create RSA key and save as PEM file
+	key, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return nil, err
+	}
+	privPEMBlock, err := x509.EncryptPEMBlock(
+		rand.Reader,
+		rsaPrivateKeyPEMBlockType,
+		x509.MarshalPKCS1PrivateKey(key),
+		password,
+		x509.PEMCipher3DES,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := pem.Encode(file, privPEMBlock); err != nil {
 		os.Remove(name)
 		return nil, err
 	}
@@ -309,27 +314,6 @@ func pemCert(derBytes []byte) []byte {
 	}
 	out := pem.EncodeToMemory(pemBlock)
 	return out
-}
-
-// protect an rsa key with a password
-func encryptedKey(key *rsa.PrivateKey, password []byte) ([]byte, error) {
-	privBytes := x509.MarshalPKCS1PrivateKey(key)
-	privPEMBlock, err := x509.EncryptPEMBlock(rand.Reader, rsaPrivateKeyPEMBlockType, privBytes, password, x509.PEMCipher3DES)
-	if err != nil {
-		return nil, err
-	}
-
-	out := pem.EncodeToMemory(privPEMBlock)
-	return out, nil
-}
-
-// create a new RSA private key
-func newRSAKey(bits int) (*rsa.PrivateKey, error) {
-	private, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		return nil, err
-	}
-	return private, nil
 }
 
 func envString(key, def string) string {
