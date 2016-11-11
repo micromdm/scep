@@ -1,21 +1,21 @@
 package scepserver
 
 import (
+	"bufio"
+	"bytes"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
-	"bufio"
-	"io"
-	"strings"
 	"fmt"
-	"bytes"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"os"
-	"time"
-	"strconv"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // Depot is a repository for managing certificates
@@ -59,7 +59,7 @@ func (d fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 const (
 	certPerm   = 0444
 	serialPerm = 0400
-	dbPerm = 0600
+	dbPerm     = 0600
 )
 
 // Put adds a certificate to the depot
@@ -70,7 +70,7 @@ func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
 	if crt.Raw == nil {
 		return errors.New("data is nil")
 	}
-	data := crt.Raw;
+	data := crt.Raw
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
 		return err
@@ -125,11 +125,11 @@ func (d fileDepot) Serial() (*big.Int, error) {
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
-	data = strings.TrimSuffix(data ,"\r")
-	data = strings.TrimSuffix(data ,"\n")
-	serial, ok := s.SetString(data,16)
+	data = strings.TrimSuffix(data, "\r")
+	data = strings.TrimSuffix(data, "\n")
+	serial, ok := s.SetString(data, 16)
 	if !ok {
-		return nil, errors.New("could not convert "+string(data)+" to serial number")
+		return nil, errors.New("could not convert " + string(data) + " to serial number")
 	}
 	return serial, nil
 }
@@ -142,29 +142,29 @@ func makeOpenSSLTime(t time.Time) string {
 
 func makeDn(cert *x509.Certificate) string {
 	var dn bytes.Buffer
-	
-	if len(cert.Subject.Country) >0 && len(cert.Subject.Country[0]) > 0 {
+
+	if len(cert.Subject.Country) > 0 && len(cert.Subject.Country[0]) > 0 {
 		dn.WriteString("/C=" + cert.Subject.Country[0])
 	}
 	if len(cert.Subject.Province) > 0 && len(cert.Subject.Province[0]) > 0 {
 		dn.WriteString("/ST=" + cert.Subject.Province[0])
 	}
-	if len(cert.Subject.Locality) >0 && len(cert.Subject.Locality[0]) > 0 {
+	if len(cert.Subject.Locality) > 0 && len(cert.Subject.Locality[0]) > 0 {
 		dn.WriteString("/L=" + cert.Subject.Locality[0])
 	}
-	if len(cert.Subject.Organization) >0 && len(cert.Subject.Organization[0]) > 0 {
+	if len(cert.Subject.Organization) > 0 && len(cert.Subject.Organization[0]) > 0 {
 		dn.WriteString("/O=" + cert.Subject.Organization[0])
 	}
-	if len(cert.Subject.OrganizationalUnit) >0 && len(cert.Subject.OrganizationalUnit[0]) > 0 {
+	if len(cert.Subject.OrganizationalUnit) > 0 && len(cert.Subject.OrganizationalUnit[0]) > 0 {
 		dn.WriteString("/OU=" + cert.Subject.OrganizationalUnit[0])
 	}
-	if len(cert.Subject.CommonName) >0 {
-		dn.WriteString("/CN="+cert.Subject.CommonName)
+	if len(cert.Subject.CommonName) > 0 {
+		dn.WriteString("/CN=" + cert.Subject.CommonName)
 	}
-	if len(cert.EmailAddresses) >0 {
+	if len(cert.EmailAddresses) > 0 {
 		dn.WriteString("/emailAddress=" + cert.EmailAddresses[0])
 	}
-	return dn.String();
+	return dn.String()
 }
 
 // Determine if the cadb already has a valid certificate with the same name
@@ -191,56 +191,56 @@ func (d fileDepot) dbHasCn(cn string, allowTime int, cert *x509.Certificate, rev
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if(strings.HasSuffix(line, dn)){
+		if strings.HasSuffix(line, dn) {
 			// Removing revoked certificate from candidates, if any
-			if(strings.HasPrefix(line, "R\t")){
-				entries := strings.Split(line,"\t")
+			if strings.HasPrefix(line, "R\t") {
+				entries := strings.Split(line, "\t")
 				serial := strings.ToUpper(entries[3])
 				candidates[serial] = line
-				delete(candidates,serial)
-				addDB.WriteString(line+"\n");
-			// Test & add certificate candidates, if any
-			} else if(strings.HasPrefix(line, "V\t")){
-				issueDate, err := strconv.Atoi(strings.Replace(strings.Split(line,"\t")[1],"Z","",1))
+				delete(candidates, serial)
+				addDB.WriteString(line + "\n")
+				// Test & add certificate candidates, if any
+			} else if strings.HasPrefix(line, "V\t") {
+				issueDate, err := strconv.Atoi(strings.Replace(strings.Split(line, "\t")[1], "Z", "", 1))
 				if err != nil {
-				file.Close()
+					file.Close()
 					return errors.New("Could not get expiry date from ca db")
 				}
-				minimalRenewDate, err := strconv.Atoi(strings.Replace(makeOpenSSLTime(time.Now().AddDate(0, 0, allowTime).UTC()),"Z","",1))
+				minimalRenewDate, err := strconv.Atoi(strings.Replace(makeOpenSSLTime(time.Now().AddDate(0, 0, allowTime).UTC()), "Z", "", 1))
 				if err != nil {
 					file.Close()
 					return errors.New("Could not calculate expiry date")
 				}
-				entries := strings.Split(line,"\t")
+				entries := strings.Split(line, "\t")
 				serial := strings.ToUpper(entries[3])
-			
+
 				// all non renewable certificates
-				if(minimalRenewDate < issueDate && allowTime > 0){
+				if minimalRenewDate < issueDate && allowTime > 0 {
 					candidates[serial] = "no"
 				} else {
 					candidates[serial] = line
 				}
 			}
 		} else {
-			addDB.WriteString(line+"\n");
+			addDB.WriteString(line + "\n")
 		}
 	}
 	file.Close()
 	for key, value := range candidates {
 		if value == "no" {
-			return errors.New("DN "+dn+" already exists")
-			}
+			return errors.New("DN " + dn + " already exists")
+		}
 		if revokeOldCertificate {
-			fmt.Println("Revoking certificate with serial "+key+" from DB. Recreation of CRL needed.")
-			entries := strings.Split(value,"\t")
-			addDB.WriteString("R\t"+entries[1]+"\t"+makeOpenSSLTime(time.Now())+"\t"+strings.ToUpper(entries[3])+"\t"+entries[4]+"\t"+entries[5]+"\n")
+			fmt.Println("Revoking certificate with serial " + key + " from DB. Recreation of CRL needed.")
+			entries := strings.Split(value, "\t")
+			addDB.WriteString("R\t" + entries[1] + "\t" + makeOpenSSLTime(time.Now()) + "\t" + strings.ToUpper(entries[3]) + "\t" + entries[4] + "\t" + entries[5] + "\n")
 		}
 	}
 	if err := scanner.Err(); err != nil {
 		return err
-	}  
+	}
 	if revokeOldCertificate {
-		file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR, dbPerm)
+		file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, dbPerm)
 		if err != nil {
 			return err
 		}
@@ -264,7 +264,7 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	}
 	name := d.path("index.txt")
 
-	file, err := os.OpenFile(name, os.O_CREATE | os.O_RDWR | os.O_APPEND, dbPerm)
+	file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR|os.O_APPEND, dbPerm)
 	if err != nil {
 		return fmt.Errorf("could not append to "+name+" : %q\n", err.Error())
 	}
@@ -273,24 +273,24 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	// Format of the caDB, see http://pki-tutorial.readthedocs.io/en/latest/cadb.html
 	//   STATUSFLAG  EXPIRATIONDATE  REVOCATIONDATE(or emtpy)	SERIAL_IN_HEX   CERTFILENAME_OR_'unknown'   Certificate_DN
 
-	serialHex  := strings.ToUpper(fmt.Sprintf("%x", cert.SerialNumber))
+	serialHex := strings.ToUpper(fmt.Sprintf("%x", cert.SerialNumber))
 
-	validDate := makeOpenSSLTime(cert.NotAfter);
+	validDate := makeOpenSSLTime(cert.NotAfter)
 
 	dn := makeDn(cert)
 
 	// Valid
 	dbEntry.WriteString("V\t")
 	// Valid till
-	dbEntry.WriteString(validDate+"\t")
+	dbEntry.WriteString(validDate + "\t")
 	// Empty (not revoked)
 	dbEntry.WriteString("\t")
 	// Serial in Hex
-	dbEntry.WriteString(serialHex+"\t")
+	dbEntry.WriteString(serialHex + "\t")
 	// Certificate file name
-	dbEntry.WriteString(filename+"\t")
+	dbEntry.WriteString(filename + "\t")
 	// Certificate DN
-	dbEntry.WriteString(dn);
+	dbEntry.WriteString(dn)
 	dbEntry.WriteString("\n")
 
 	if _, err := file.Write(dbEntry.Bytes()); err != nil {
@@ -298,7 +298,6 @@ func (d fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x5
 	}
 	return nil
 }
-
 
 func (d fileDepot) writeSerial(serial *big.Int) error {
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
@@ -313,7 +312,7 @@ func (d fileDepot) writeSerial(serial *big.Int) error {
 	}
 	defer file.Close()
 
-	if _, err := file.WriteString(fmt.Sprintf("%x\n",serial.Bytes())); err != nil {
+	if _, err := file.WriteString(fmt.Sprintf("%x\n", serial.Bytes())); err != nil {
 		file.Close()
 		os.Remove(name)
 		return err
@@ -397,7 +396,7 @@ func loadCert(data []byte) (*x509.Certificate, error) {
 
 func pemCert(derBytes []byte) []byte {
 	pemBlock := &pem.Block{
-		Type:	certificatePEMBlockType,
+		Type:    certificatePEMBlockType,
 		Headers: nil,
 		Bytes:   derBytes,
 	}
