@@ -164,7 +164,7 @@ func caMain(cmd *flag.FlagSet) int {
 
 // create a key, save it to depot and return it for further usage
 func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error) {
-	key, err := newRSAKey(bits)
+	key, err := rsa.GenerateKey(rand.Reader, bits)
 	if err != nil {
 		return nil, err
 	}
@@ -321,15 +321,6 @@ func encryptedKey(key *rsa.PrivateKey, password []byte) ([]byte, error) {
 
 	out := pem.EncodeToMemory(privPEMBlock)
 	return out, nil
-}
-
-// create a new RSA private key
-func newRSAKey(bits int) (*rsa.PrivateKey, error) {
-	private, err := rsa.GenerateKey(rand.Reader, bits)
-	if err != nil {
-		return nil, err
-	}
-	return private, nil
 }
 
 func envString(key, def string) string {
