@@ -6,10 +6,6 @@ import:
   - endpoint
   - log
   - transport/http
-- package: github.com/mholt/caddy
-  version: ^0.9.0
-  subpackages:
-  - caddyhttp/httpserver
 - package: golang.org/x/net
   subpackages:
   - context

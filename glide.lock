@@ -1,14 +1,6 @@
-hash: 12f14fa7635322a53ba5299b45b3aabefd90f50c726a3c6d94b82ff035e34aed
-updated: 2016-08-13T21:28:24.290796579-04:00
+hash: 16f973415fd1764dbff6c7a52c94861f25145139a5752c5180f8756f6391028d
+updated: 2016-11-11T09:56:01.599837376-05:00
 imports:
-- name: github.com/aead/chacha20
-  version: 86d922430f9b10a1225b9ea99fe5a126b6fe92d2
-  subpackages:
-  - chacha
-- name: github.com/aead/poly1305
-  version: 4af339a4f7f44cce6e262edb8cf7f15af5b9a8aa
-- name: github.com/flynn/go-shlex
-  version: 3f9db97f856818214da2e1057f8ad84803971cff
 - name: github.com/go-kit/kit
   version: 6fb874ce59bb45b2f60ee3d289829db02142ecc6
   subpackages:
@@ -21,63 +13,9 @@ imports:
   version: 100eb0c0a9c5b306ca2fb4f165df21d80ada4b82
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
-- name: github.com/lucas-clemente/aes12
-  version: 5a3c52721c1e81aa8162601ac2342486525156d5
-- name: github.com/lucas-clemente/fnv128a
-  version: 393af48d391698c6ae4219566bfbdfef67269997
-- name: github.com/lucas-clemente/quic-go
-  version: 1ceb7fc4e08a88d98ba418788f2206df2d0c88da
-  subpackages:
-  - ackhandler
-  - ackhandlerlegacy
-  - congestion
-  - crypto
-  - flowcontrol
-  - frames
-  - h2quic
-  - handshake
-  - protocol
-  - qerr
-  - utils
-- name: github.com/lucas-clemente/quic-go-certificates
-  version: 9bb36d3159787cca26dcfa15e23049615e307ef8
-- name: github.com/mholt/caddy
-  version: f28af637327a4f12ae745284c519cfdeca5502ef
-  subpackages:
-  - caddyfile
-  - caddyhttp/httpserver
-  - caddyhttp/staticfiles
-  - caddytls
-- name: github.com/miekg/dns
-  version: db96a2b759cdef4f11a34506a42eb8d1290c598e
-- name: github.com/russross/blackfriday
-  version: 93622da34e54fb6529bfb7c57e710f37a8d9cbd8
-- name: github.com/shurcooL/sanitized_anchor_name
-  version: 10ef21a441db47d8b13ebcc5fd2310f636973c77
-- name: github.com/xenolf/lego
-  version: eb7c5e6bb6f5ac89d1967ef0dd8861702dd30bbd
-  subpackages:
-  - acme
-- name: golang.org/x/crypto
-  version: a548aac93ed489257b9d959b40fe1e8c1e20778c
-  subpackages:
-  - curve25519
-  - hkdf
-  - ocsp
 - name: golang.org/x/net
   version: 07b51741c1d6423d4a6abab1c49940ec09cb1aaf
   subpackages:
   - context
   - context/ctxhttp
-  - http2
-  - http2/hpack
-  - lex/httplex
-  - publicsuffix
-- name: gopkg.in/natefinch/lumberjack.v2
-  version: 514cbda263a734ae8caac038dadf05f8f3f9f738
-- name: gopkg.in/square/go-jose.v1
-  version: a3927f83df1b1516f9e9dec71839c93e6bcf1db0
-  subpackages:
-  - cipher
-  - json
 testImports: []
