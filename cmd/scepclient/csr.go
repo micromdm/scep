@@ -49,12 +49,12 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 func newCSR(priv *rsa.PrivateKey, ou string, locality string, province string, country string, cname, org string) ([]byte, error) {
 	subj := pkix.Name{
 		CommonName:   cname,
-		Country:      []string{country},
-		Organization: []string{org},
-		Locality: []string{locality},
-		OrganizationalUnit: []string{ou},
-		Province: []string{province},
 	}
+	if len(org) > 0	{ subj.Organization = []string{org} }
+	if len(ou) > 0	{ subj.OrganizationalUnit = []string{ou} }
+	if len(province) > 0	{ subj.Province = []string{province} }
+	if len(locality) > 0	{ subj.Locality = []string{locality} }
+	if len(country) > 0	{ subj.Country = []string{country} }
 	template := &x509.CertificateRequest{
 		Subject: subj,
 	}

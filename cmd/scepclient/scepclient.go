@@ -44,10 +44,10 @@ func isAsciiPrintableTo(s string) int {
 	for _, r := range s {
 		count = count + 1
 		if r > unicode.MaxLatin1 || !unicode.IsPrint(r) {
-			return count
+			return count-1
 		}
 	}
-	return count
+	return count-1
 }
 
 func run(cfg runCfg) error {
@@ -153,14 +153,16 @@ func run(cfg runCfg) error {
 
 	respBytes, err := client.PKIOperation(ctx, msg.Raw)
 	if err != nil {
-        return fmt.Errorf("Error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
+		return fmt.Errorf("Server reply : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
 	}
+
 	respMsg, err := scep.ParsePKIMessage(respBytes)
 	if err != nil {
-        return fmt.Errorf("Error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
+		return fmt.Errorf("Server reply : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
 	}
+
 	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
-        fmt.Println("Error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
+		fmt.Println("Server error : "+string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
 		os.Exit(1)
 	}
 
