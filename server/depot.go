@@ -28,6 +28,12 @@ type Depot interface {
 
 // NewFileDepot returns a new cert depot
 func NewFileDepot(path string) (Depot, error) {
+	f, err := os.OpenFile(fmt.Sprintf("%s/index.txt", path),
+		os.O_RDONLY|os.O_CREATE, 0666)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 	return fileDepot{dirPath: path}, nil
 }
 
@@ -89,7 +95,6 @@ func (d fileDepot) Put(cn string, crt *x509.Certificate) error {
 	defer file.Close()
 
 	if _, err := file.Write(pemCert(data)); err != nil {
-		file.Close()
 		os.Remove(name)
 		return err
 	}
@@ -185,6 +190,7 @@ func (d fileDepot) dbHasCn(cn string, allowTime int, cert *x509.Certificate, rev
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
 	// Loop over index.txt, determine if a certificate is valid and can be revoked
 	// revoke certificate in DB if requested
@@ -203,12 +209,10 @@ func (d fileDepot) dbHasCn(cn string, allowTime int, cert *x509.Certificate, rev
 			} else if strings.HasPrefix(line, "V\t") {
 				issueDate, err := strconv.Atoi(strings.Replace(strings.Split(line, "\t")[1], "Z", "", 1))
 				if err != nil {
-					file.Close()
 					return errors.New("Could not get expiry date from ca db")
 				}
 				minimalRenewDate, err := strconv.Atoi(strings.Replace(makeOpenSSLTime(time.Now().AddDate(0, 0, allowTime).UTC()), "Z", "", 1))
 				if err != nil {
-					file.Close()
 					return errors.New("Could not calculate expiry date")
 				}
 				entries := strings.Split(line, "\t")
