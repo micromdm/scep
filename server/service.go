@@ -66,7 +66,6 @@ func (svc service) GetCACert(ctx context.Context) ([]byte, int, error) {
 func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
 	msg, err := scep.ParsePKIMessage(data)
 	if err != nil {
-		// handle err
 		return nil, err
 	}
 	ca := svc.ca[0]
@@ -77,7 +76,6 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 	// validate challenge passwords
 	if msg.MessageType == scep.PKCSReq {
 		if !svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword) {
-			// handle err
 			return nil, errors.New("scep challenge password does not match")
 		}
 	}

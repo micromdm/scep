@@ -106,3 +106,43 @@ func TestDepot_incrementSerial(t *testing.T) {
 		}
 	}
 }
+
+func TestDepot_CreateOrLoadKey(t *testing.T) {
+	db := createDB(0666, nil)
+	tests := []struct {
+		bits    int
+		wantErr bool
+	}{
+		{
+			bits: 1024,
+		},
+		{
+			bits: 2048,
+		},
+	}
+	for i, tt := range tests {
+		if _, err := db.CreateOrLoadKey(tt.bits); (err != nil) != tt.wantErr {
+			t.Errorf("%d. Depot.CreateOrLoadKey() error = %v, wantErr %v", i, err, tt.wantErr)
+		}
+	}
+}
+
+func TestDepot_CreateOrLoadCA(t *testing.T) {
+	db := createDB(0666, nil)
+	tests := []struct {
+		wantErr bool
+	}{
+		{},
+		{},
+	}
+	for i, tt := range tests {
+		key, err := db.CreateOrLoadKey(1024)
+		if err != nil {
+			t.Fatalf("%d. Depot.CreateOrLoadKey() error = %v", i, err)
+		}
+
+		if _, err := db.CreateOrLoadCA(key, 10, "MicroMDM", "US"); (err != nil) != tt.wantErr {
+			t.Errorf("%d. Depot.CreateOrLoadCA() error = %v, wantErr %v", i, err, tt.wantErr)
+		}
+	}
+}
