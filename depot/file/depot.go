@@ -369,10 +369,12 @@ func loadKey(data []byte, password []byte) (*rsa.PrivateKey, error) {
 		return nil, errors.New("unmatched type or headers")
 	}
 
-	b, err := x509.DecryptPEMBlock(pemBlock, password)
-	if err != nil {
-		return nil, err
-	}
+    if password != "" {
+		b, err := x509.DecryptPEMBlock(pemBlock, password)
+		if err != nil {
+			return nil, err
+		}
+    }
 	return x509.ParsePKCS1PrivateKey(b)
 }
 
