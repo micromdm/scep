@@ -10,15 +10,16 @@ To compile the SCEP client and server, there are a few requirements.
 * You must have a shell variable set for $GOPATH. This is a directory used by the Go compiler and utilities for all Go projects.
 
 1. Once all of those are set, clone the repository with `go get github.com/micromdm/scep`
-2. Install the glide packages with the following commands:
+2. Install the glide packages 
     * `cd $GOPATH/src/github.com/micromdm/scep/`
     * `glide install`
-3. Compile the components with:
+3. Compile the Server Binary
     * `cd $GOPATH/src/github.com/micromdm/scep/cmd/scepserver`
     * `go build`
+4. Compile the Client Binary
     * `cd $GOPATH/src/github.com/micromdm/scep/cmd/scepclient`
     * `go build`
-4. The binaries will be put in the directory where you ran `go build`
+4. The binaries will be put in the directory where you ran `go build`.
 
 
 # Example
