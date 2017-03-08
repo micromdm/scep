@@ -19,7 +19,7 @@ To compile the SCEP client and server, there are a few requirements.
 4. Compile the Client Binary
     * `cd $GOPATH/src/github.com/micromdm/scep/cmd/scepclient`
     * `go build`
-4. The binaries will be put in the directory where you ran `go build`.
+4. The binaries will be put in the directories where you ran `go build`.
 
 
 # Example
