@@ -16,7 +16,9 @@ import (
 	kitlog "github.com/go-kit/kit/log"
 	"golang.org/x/net/context"
 
-	"github.com/micromdm/scep/server"
+	"github.com/micromdm/scep/depot"
+	filedepot "github.com/micromdm/scep/depot/file"
+	scepserver "github.com/micromdm/scep/server"
 )
 
 func TestCACaps(t *testing.T) {
@@ -49,9 +51,9 @@ func TestPKIOperation(t *testing.T) {
 
 func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server, scepserver.Service) {
 	var err error
-	var depot scepserver.Depot // cert storage
+	var depot depot.Depot // cert storage
 	{
-		depot, err = scepserver.NewFileDepot("../scep/testdata/testca")
+		depot, err = filedepot.NewFileDepot("../scep/testdata/testca")
 		if err != nil {
 			t.Fatal(err)
 		}

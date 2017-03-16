@@ -54,7 +54,11 @@ func (db *Depot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
 		if caCert == nil {
 			return fmt.Errorf("no ca_certificate in bucket")
 		}
-		cert, err := x509.ParseCertificate(caCert)
+		// we need to make a copy of the byte slice because the asn.Unmarshal
+		// method called by ParseCertificate will retain a reference to the original.
+		// The slice should no longer be referenced once the BoltDB transaction is closed.
+		caCertBytes := append([]byte(nil), caCert...)
+		cert, err := x509.ParseCertificate(caCertBytes)
 		if err != nil {
 			return err
 		}
@@ -74,7 +78,7 @@ func (db *Depot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	return chain, key, err
+	return chain, key, nil
 }
 
 func (db *Depot) Put(cn string, crt *x509.Certificate) error {
@@ -85,6 +89,7 @@ func (db *Depot) Put(cn string, crt *x509.Certificate) error {
 	if err != nil {
 		return err
 	}
+
 	err = db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(certBucket))
 		if bucket == nil {
