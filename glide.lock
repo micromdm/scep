@@ -1,21 +1,27 @@
-hash: 16f973415fd1764dbff6c7a52c94861f25145139a5752c5180f8756f6391028d
-updated: 2016-11-11T09:56:01.599837376-05:00
+hash: 2b26616db64c62da0b477bc295912993993361a7fc9c1c5c5163dc5f57512e83
+updated: 2017-03-17T15:02:37.198666981-04:00
 imports:
+- name: github.com/boltdb/bolt
+  version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
 - name: github.com/go-kit/kit
-  version: 6fb874ce59bb45b2f60ee3d289829db02142ecc6
+  version: fadad6fffe0466b19df9efd9acde5c9a52df5fa4
   subpackages:
   - endpoint
   - log
   - transport/http
 - name: github.com/go-logfmt/logfmt
-  version: d4327190ff838312623b09bfeb50d7c93c8d9c1d
+  version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
 - name: github.com/go-stack/stack
   version: 100eb0c0a9c5b306ca2fb4f165df21d80ada4b82
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: golang.org/x/net
-  version: 07b51741c1d6423d4a6abab1c49940ec09cb1aaf
+  version: 4d38db76854b199960801a1734443fd02870d7e1
   subpackages:
   - context
   - context/ctxhttp
+- name: golang.org/x/sys
+  version: a646d33e2ee3172a661fc09bca23bb4889a41bc8
+  subpackages:
+  - unix
 testImports: []

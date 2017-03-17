@@ -76,8 +76,8 @@ func main() {
 	var logger log.Logger
 	{
 		logger = log.NewLogfmtLogger(os.Stderr)
-		logger = log.NewContext(logger).With("ts", log.DefaultTimestampUTC)
-		logger = log.NewContext(logger).With("caller", log.DefaultCaller)
+		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
 
 	var err error
@@ -112,12 +112,12 @@ func main() {
 			logger.Log("err", err)
 			os.Exit(1)
 		}
-		svc = scepserver.NewLoggingService(log.NewContext(logger).With("component", "service"), svc)
+		svc = scepserver.NewLoggingService(log.With(logger, "component", "service"), svc)
 	}
 
 	var h http.Handler // http handler
 	{
-		h = scepserver.ServiceHandler(ctx, svc, log.NewContext(logger).With("component", "http"))
+		h = scepserver.ServiceHandler(ctx, svc, log.With(logger, "component", "http"))
 	}
 
 	// start http server
