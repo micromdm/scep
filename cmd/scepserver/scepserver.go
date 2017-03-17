@@ -24,7 +24,7 @@ import (
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/depot/file"
 	"github.com/micromdm/scep/server"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // version info

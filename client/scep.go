@@ -9,7 +9,7 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/micromdm/scep/server"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // Client implements the SCEP service and extra methods

@@ -10,7 +10,7 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // ServiceHandler is an HTTP Handler for a SCEP endpoint.

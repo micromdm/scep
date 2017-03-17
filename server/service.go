@@ -12,7 +12,7 @@ import (
 
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
-	"golang.org/x/net/context"
+	"context"
 )
 
 // Service is the interface for all supported SCEP server operations.
