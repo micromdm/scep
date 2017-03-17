@@ -2,7 +2,6 @@ package scepclient
 
 import (
 	"bytes"
-	"errors"
 	"net/http"
 	"net/url"
 
@@ -84,15 +83,18 @@ func (c *client) PKIOperation(ctx context.Context, data []byte) ([]byte, error) 
 		Operation: "PKIOperation",
 		Message:   data,
 	}
+	var reply interface{}
+	var err error
 	if c.Supports("POSTPKIOperation") {
-		reply, err := c.postRemote(ctx, request)
-		if err != nil {
-			return nil, err
-		}
-		r := reply.(scepserver.SCEPResponse)
-		return r.Data, nil
+		reply, err = c.postRemote(ctx, request)
+	} else {
+		reply, err = c.getRemote(ctx, request)
 	}
-	return nil, errors.New("no POSTPKIOperation support")
+	if err != nil {
+		return nil, err
+	}
+	r := reply.(scepserver.SCEPResponse)
+	return r.Data, nil
 }
 
 func (c *client) GetNextCACert(ctx context.Context) ([]byte, error) {
