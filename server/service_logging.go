@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"golang.org/x/net/context"
+	"context"
 )
 
 type loggingService struct {

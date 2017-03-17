@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
-	"golang.org/x/net/context"
+	"context"
 	"io/ioutil"
 	"net/url"
 	"os"

@@ -14,7 +14,7 @@ import (
 	"testing"
 
 	kitlog "github.com/go-kit/kit/log"
-	"golang.org/x/net/context"
+	"context"
 
 	"github.com/micromdm/scep/server"
 )
