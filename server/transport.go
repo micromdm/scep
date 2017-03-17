@@ -2,6 +2,7 @@ package scepserver
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -10,7 +11,6 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
-	"golang.org/x/net/context"
 )
 
 // ServiceHandler is an HTTP Handler for a SCEP endpoint.
@@ -21,7 +21,6 @@ func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http
 	}
 
 	scepHandler := kithttp.NewServer(
-		ctx,
 		makeSCEPEndpoint(svc),
 		decodeSCEPRequest,
 		encodeSCEPResponse,
