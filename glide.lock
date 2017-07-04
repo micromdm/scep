@@ -1,10 +1,12 @@
 hash: 2b26616db64c62da0b477bc295912993993361a7fc9c1c5c5163dc5f57512e83
-updated: 2017-03-17T15:02:37.198666981-04:00
+updated: 2017-07-04T14:38:27.684179333-04:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
+- name: github.com/fullsailor/pkcs7
+  version: 3befe47e6c80b97ab6863a5fe1b6a611003a5ab0
 - name: github.com/go-kit/kit
-  version: fadad6fffe0466b19df9efd9acde5c9a52df5fa4
+  version: a9ca6725cbbea455e61c6bc8a1ed28e81eb3493b
   subpackages:
   - endpoint
   - log
@@ -19,7 +21,6 @@ imports:
   version: 4d38db76854b199960801a1734443fd02870d7e1
   subpackages:
   - context
-  - context/ctxhttp
 - name: golang.org/x/sys
   version: a646d33e2ee3172a661fc09bca23bb4889a41bc8
   subpackages:
