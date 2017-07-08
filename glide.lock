@@ -1,5 +1,5 @@
 hash: 2b26616db64c62da0b477bc295912993993361a7fc9c1c5c5163dc5f57512e83
-updated: 2017-07-04T14:38:27.684179333-04:00
+updated: 2017-07-08T10:14:04.710249691-04:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -15,6 +15,10 @@ imports:
   version: 390ab7935ee28ec6b286364bba9b4dd6410cb3d5
 - name: github.com/go-stack/stack
   version: 100eb0c0a9c5b306ca2fb4f165df21d80ada4b82
+- name: github.com/groob/finalizer
+  version: 4c2ed49aabdaa038f247d72d183e410757cdbe9c
+  subpackages:
+  - logutil
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
 - name: golang.org/x/net

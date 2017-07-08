@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
 	"golang.org/x/net/context"
@@ -45,6 +46,9 @@ type service struct {
 	challengePassword string
 	allowRenewal      int // days before expiry, 0 to disable
 	clientValidity    int // client cert validity in days
+
+	/// info logging is implemented in the service middleware layer.
+	debugLogger log.Logger
 }
 
 func (svc service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -189,10 +193,20 @@ func ClientValidity(duration int) ServiceOption {
 	}
 }
 
+// WithLogger configures a logger for the SCEP Service.
+// By default, a no-op logger is used.
+func WithLogger(logger log.Logger) ServiceOption {
+	return func(s *service) error {
+		s.debugLogger = logger
+		return nil
+	}
+}
+
 // NewService creates a new scep service
 func NewService(depot depot.Depot, opts ...ServiceOption) (Service, error) {
 	s := &service{
-		depot: depot,
+		depot:       depot,
+		debugLogger: log.NewNopLogger(),
 	}
 	for _, opt := range opts {
 		if err := opt(s); err != nil {

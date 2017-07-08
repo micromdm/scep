@@ -17,7 +17,7 @@ func NewLoggingService(logger log.Logger, s Service) Service {
 	return &loggingService{logger, s}
 }
 
-func (mw loggingService) GetCACaps(ctx context.Context) (caps []byte, err error) {
+func (mw *loggingService) GetCACaps(ctx context.Context) (caps []byte, err error) {
 	defer func(begin time.Time) {
 		_ = mw.logger.Log(
 			"method", "GetCACaps",
@@ -29,7 +29,7 @@ func (mw loggingService) GetCACaps(ctx context.Context) (caps []byte, err error)
 	return
 }
 
-func (mw loggingService) GetCACert(ctx context.Context) (cert []byte, certNum int, err error) {
+func (mw *loggingService) GetCACert(ctx context.Context) (cert []byte, certNum int, err error) {
 	defer func(begin time.Time) {
 		_ = mw.logger.Log(
 			"method", "GetCACert",
@@ -41,7 +41,7 @@ func (mw loggingService) GetCACert(ctx context.Context) (cert []byte, certNum in
 	return
 }
 
-func (mw loggingService) PKIOperation(ctx context.Context, data []byte) (certRep []byte, err error) {
+func (mw *loggingService) PKIOperation(ctx context.Context, data []byte) (certRep []byte, err error) {
 	defer func(begin time.Time) {
 		_ = mw.logger.Log(
 			"method", "PKIOperation",
