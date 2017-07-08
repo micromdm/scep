@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/endpoint"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/groob/finalizer/logutil"
 )
 
 // ServiceHandler is an HTTP Handler for a SCEP endpoint.
@@ -18,6 +19,7 @@ func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(logger),
 		kithttp.ServerBefore(updateContext),
+		kithttp.ServerFinalizer(logutil.NewHTTPLogger(logger).LoggingFinalizer),
 	}
 
 	scepHandler := kithttp.NewServer(
