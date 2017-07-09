@@ -2,18 +2,19 @@ package main
 
 import (
 	"crypto/x509"
-	"errors"
 	"flag"
 	"fmt"
-	"github.com/micromdm/scep/client"
-	"github.com/micromdm/scep/scep"
-	"golang.org/x/net/context"
 	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"unicode"
+
+	"github.com/micromdm/scep/client"
+	"github.com/micromdm/scep/scep"
+	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 )
 
 // version info
@@ -148,22 +149,25 @@ func run(cfg runCfg) error {
 
 	msg, err := scep.NewCSRRequest(csr, tmpl)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "creating csr pkiMessage")
 	}
 
 	respBytes, err := client.PKIOperation(ctx, msg.Raw)
 	if err != nil {
-		return fmt.Errorf("Server reply : " + string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
+		return errors.Wrapf(err, "PKIOperation for %s", msgType)
 	}
 
 	respMsg, err := scep.ParsePKIMessage(respBytes)
 	if err != nil {
-		return fmt.Errorf("Server reply : " + string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
+		return errors.Wrapf(err, "parsing pkiMessage response %s", msgType)
+	}
+
+	if respMsg.PKIStatus == scep.FAILURE {
+		return errors.Errorf("%s request failed, failInfo: %s", msgType, respMsg.FailInfo)
 	}
 
 	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
-		fmt.Println("Server error : " + string(respBytes[0:isAsciiPrintableTo(string(respBytes))]))
-		os.Exit(1)
+		return errors.Wrapf(err, "decrypt pkiEnvelope, msgType: %s, status %s", msgType, respMsg.PKIStatus)
 	}
 
 	respCert := respMsg.CertRepMessage.Certificate

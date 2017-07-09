@@ -43,6 +43,27 @@ const (
 	GetCRL                 = "22"
 )
 
+func (msg MessageType) String() string {
+	switch msg {
+	case CertRep:
+		return "CertRep (3)"
+	case RenewalReq:
+		return "RenewalReq (17)"
+	case UpdateReq:
+		return "UpdateReq (18)"
+	case PKCSReq:
+		return "PKCSReq (19)"
+	case CertPoll:
+		return "CertPoll (20) "
+	case GetCert:
+		return "GetCert (21)"
+	case GetCRL:
+		return "GetCRL (22)"
+	default:
+		panic("scep: unknown messageType" + msg)
+	}
+}
+
 // PKIStatus is a SCEP pkiStatus attribute which holds transaction status information.
 // All SCEP responses MUST include a pkiStatus.
 //
@@ -70,6 +91,23 @@ const (
 	BadTime                  = "3"
 	BadCertID                = "4"
 )
+
+func (info FailInfo) String() string {
+	switch info {
+	case BadAlg:
+		return "badAlg (0)"
+	case BadMessageCheck:
+		return "badMessageCheck (1)"
+	case BadRequest:
+		return "badRequest (2)"
+	case BadTime:
+		return "badTime (3)"
+	case BadCertID:
+		return "badCertID (4)"
+	default:
+		panic("scep: unknown failInfo type" + info)
+	}
+}
 
 // SenderNonce is a random 16 byte number.
 // A sender must include the senderNonce in each transaction to a recipient.
