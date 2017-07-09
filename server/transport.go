@@ -3,7 +3,7 @@ package scepserver
 import (
 	"bytes"
 	"context"
-	"errors"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -12,6 +12,7 @@ import (
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
 	"github.com/groob/finalizer/logutil"
+	"github.com/pkg/errors"
 )
 
 // ServiceHandler is an HTTP Handler for a SCEP endpoint.
@@ -42,7 +43,7 @@ func updateContext(ctx context.Context, r *http.Request) context.Context {
 	return ctx
 }
 
-// EncodeSCEPRequest encodes a SCEP http request
+// EncodeSCEPRequest encodes a SCEP HTTP Request. Used by the client.
 func EncodeSCEPRequest(ctx context.Context, r *http.Request, request interface{}) error {
 	req := request.(SCEPRequest)
 	params := r.URL.Query()
@@ -50,20 +51,26 @@ func EncodeSCEPRequest(ctx context.Context, r *http.Request, request interface{}
 	switch r.Method {
 	case "GET":
 		if len(req.Message) > 0 {
-			return errors.New("only POSTPKIOperation supported")
+			msg := base64.URLEncoding.EncodeToString(req.Message)
+			params.Set("message", msg)
 		}
+		r.URL.RawQuery = params.Encode()
+		return nil
 	case "POST":
-		var buf bytes.Buffer
-		_, err := buf.Write(req.Message)
+		body := bytes.NewReader(req.Message)
+		// recreate the request here because IIS does not support chunked encoding by default
+		// and Go doesn't appear to set Content-Length if we use an io.ReadCloser
+		u := r.URL
+		u.RawQuery = params.Encode()
+		rr, err := http.NewRequest("POST", u.String(), body)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "creating new POST request for %s", req.Operation)
 		}
-		r.Body = ioutil.NopCloser(&buf)
+		*r = *rr
+		return nil
 	default:
-		return errors.New("method not supported")
+		return fmt.Errorf("scep: %s method not supported", r.Method)
 	}
-	r.URL.RawQuery = params.Encode()
-	return nil
 }
 
 // DecodeSCEPRequest decodes an HTTP request to the SCEP server
