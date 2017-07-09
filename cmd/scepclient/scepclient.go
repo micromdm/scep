@@ -6,10 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/micromdm/scep/client"
@@ -165,18 +167,32 @@ func run(cfg runCfg) error {
 		return errors.Wrap(err, "creating csr pkiMessage")
 	}
 
-	respBytes, err := client.PKIOperation(ctx, msg.Raw)
-	if err != nil {
-		return errors.Wrapf(err, "PKIOperation for %s", msgType)
-	}
+	var respMsg *scep.PKIMessage
 
-	respMsg, err := scep.ParsePKIMessage(respBytes)
-	if err != nil {
-		return errors.Wrapf(err, "parsing pkiMessage response %s", msgType)
-	}
+	for {
+		// loop in case we get a PENDING response which requires
+		// a manual approval.
 
-	if respMsg.PKIStatus == scep.FAILURE {
-		return errors.Errorf("%s request failed, failInfo: %s", msgType, respMsg.FailInfo)
+		respBytes, err := client.PKIOperation(ctx, msg.Raw)
+		if err != nil {
+			return errors.Wrapf(err, "PKIOperation for %s", msgType)
+		}
+
+		respMsg, err = scep.ParsePKIMessage(respBytes)
+		if err != nil {
+			return errors.Wrapf(err, "parsing pkiMessage response %s", msgType)
+		}
+
+		switch respMsg.PKIStatus {
+		case scep.FAILURE:
+			return errors.Errorf("%s request failed, failInfo: %s", msgType, respMsg.FailInfo)
+		case scep.PENDING:
+			log.Println("pkiStatus PENDING: sleeping for 30 seconds, then trying again.")
+			time.Sleep(30 * time.Second)
+			continue
+		}
+		log.Println("pkiStatus SUCCESS: server returned a certificate.")
+		break // on scep.SUCCESS
 	}
 
 	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
