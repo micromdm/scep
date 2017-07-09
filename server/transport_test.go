@@ -34,6 +34,43 @@ func TestCACaps(t *testing.T) {
 	}
 }
 
+func TestEncodePKCSReq_Request(t *testing.T) {
+	pkcsreq := loadTestFile(t, "../scep/testdata/PKCSReq.der")
+	msg := scepserver.SCEPRequest{
+		Operation: "PKIOperation",
+		Message:   pkcsreq,
+	}
+	methods := []string{"POST", "GET"}
+	for _, method := range methods {
+		t.Run(method, func(t *testing.T) {
+			r := httptest.NewRequest(method, "http://acme.co/scep", nil)
+			rr := *r
+			if err := scepserver.EncodeSCEPRequest(context.Background(), &rr, msg); err != nil {
+				t.Fatal(err)
+			}
+
+			q := r.URL.Query()
+			if have, want := q.Get("operation"), msg.Operation; have != want {
+				t.Errorf("have %s, want %s", have, want)
+			}
+
+			if method == "POST" {
+				if have, want := rr.ContentLength, int64(len(msg.Message)); have != want {
+					t.Errorf("have %d, want %d", have, want)
+				}
+			}
+
+			if method == "GET" {
+				if q.Get("message") == "" {
+					t.Errorf("expected GET PKIOperation to have a non-empty message field")
+				}
+			}
+
+		})
+	}
+
+}
+
 func TestPKIOperation(t *testing.T) {
 	server, _ := newServer(t)
 	defer server.Close()
