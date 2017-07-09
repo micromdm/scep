@@ -1,5 +1,5 @@
 hash: 2b26616db64c62da0b477bc295912993993361a7fc9c1c5c5163dc5f57512e83
-updated: 2017-07-08T10:14:04.710249691-04:00
+updated: 2017-07-09T01:19:58.860198593-04:00
 imports:
 - name: github.com/boltdb/bolt
   version: 583e8937c61f1af6513608ccc75c97b6abdf4ff9
@@ -21,6 +21,8 @@ imports:
   - logutil
 - name: github.com/kr/logfmt
   version: b84e30acd515aadc4b783ad4ff83aff3299bdfe0
+- name: github.com/pkg/errors
+  version: 645ef00459ed84a119197bfb8d8205042c6df63d
 - name: golang.org/x/net
   version: 4d38db76854b199960801a1734443fd02870d7e1
   subpackages:
