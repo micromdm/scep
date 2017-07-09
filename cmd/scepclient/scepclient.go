@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"crypto/x509"
 	"flag"
 	"fmt"
@@ -38,6 +39,7 @@ type runCfg struct {
 	country      string
 	challenge    string
 	serverURL    string
+	caMD5        string
 }
 
 func isAsciiPrintableTo(s string) int {
@@ -134,9 +136,20 @@ func run(cfg runCfg) error {
 		}
 	}
 
+	var recipients []*x509.Certificate
+	if cfg.caMD5 == "" {
+		recipients = certs
+	} else {
+		r, err := findRecipients(cfg.caMD5, certs)
+		if err != nil {
+			return err
+		}
+		recipients = r
+	}
+
 	tmpl := &scep.PKIMessage{
 		MessageType: msgType,
-		Recipients:  certs,
+		Recipients:  recipients,
 		SignerKey:   key,
 		SignerCert:  signerCert,
 	}
@@ -185,6 +198,21 @@ func run(cfg runCfg) error {
 	return nil
 }
 
+// Determine the correct recipient based on the fingerprint.
+// In case of NDES that is the last certificate in the chain, not the RA cert.
+// Return a full chain starting with the cert that matches the fingerprint.
+func findRecipients(fingerprint string, certs []*x509.Certificate) ([]*x509.Certificate, error) {
+	fingerprint = strings.Join(strings.Split(fingerprint, " "), "")
+	fingerprint = strings.ToLower(fingerprint)
+	for i, cert := range certs {
+		sum := fmt.Sprintf("%x", md5.Sum(cert.Raw))
+		if sum == fingerprint {
+			return certs[i-1:], nil
+		}
+	}
+	return nil, errors.Errorf("could not find cert for md5 %s", fingerprint)
+}
+
 func validateFlags(keyPath, serverURL string) error {
 	if keyPath == "" {
 		return errors.New("must specify private key path")
@@ -200,7 +228,6 @@ func validateFlags(keyPath, serverURL string) error {
 }
 
 func main() {
-	// flags
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flServerURL         = flag.String("server-url", "", "SCEP server url")
@@ -214,6 +241,10 @@ func main() {
 		flLoc               = flag.String("locality", "", "locality for certificate")
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
+
+		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
+		// data is.
+		flCAFingerprint = flag.String("ca-fingerprint", "", "md5 fingerprint of CA certificate for NDES server.")
 	)
 	flag.Parse()
 
@@ -251,6 +282,7 @@ func main() {
 		province:     *flProvince,
 		challenge:    *flChallengePassword,
 		serverURL:    *flServerURL,
+		caMD5:        *flCAFingerprint,
 	}
 
 	if err := run(cfg); err != nil {
