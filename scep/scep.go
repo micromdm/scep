@@ -13,10 +13,10 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
-	"errors"
 	"math/big"
 
 	"github.com/fullsailor/pkcs7"
+	"github.com/pkg/errors"
 )
 
 // errors
@@ -245,9 +245,9 @@ func (msg *PKIMessage) parseMessageType() error {
 			}
 			cr.FailInfo = fi
 		case PENDING:
-			return errNotImplemented
+			break
 		default:
-			return errors.New("unknown scep pkiStatus")
+			return errors.Errorf("unknown scep pkiStatus %s", status)
 		}
 		msg.CertRepMessage = cr
 		return nil
