@@ -9,6 +9,8 @@ import (
 	"errors"
 	"io/ioutil"
 	"os"
+
+	"github.com/micromdm/scep/crypto/x509util"
 )
 
 const (
@@ -30,45 +32,42 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 	}
 	defer file.Close()
 
-	csrBytes, err := newCSR(opts.key, opts.ou, opts.locality, opts.province, opts.country, opts.cn, opts.org)
-	if err != nil {
-		return nil, err
+	subject := pkix.Name{
+		CommonName:         opts.cn,
+		Organization:       subjOrNil(opts.org),
+		OrganizationalUnit: subjOrNil(opts.ou),
+		Province:           subjOrNil(opts.province),
+		Locality:           subjOrNil(opts.locality),
+		Country:            subjOrNil(opts.country),
 	}
+	template := x509util.CertificateRequest{
+		CertificateRequest: x509.CertificateRequest{
+			Subject: subject,
+			// TODO: https://github.com/micromdm/scep/issues/46
+			SignatureAlgorithm: x509.SHA1WithRSA,
+		},
+	}
+	if opts.challenge != "" {
+		template.ChallengePassword = opts.challenge
+	}
+
+	derBytes, err := x509util.CreateCertificateRequest(rand.Reader, &template, opts.key)
 	pemBlock := &pem.Block{
-		Type:    csrPEMBlockType,
-		Headers: nil,
-		Bytes:   csrBytes,
+		Type:  csrPEMBlockType,
+		Bytes: derBytes,
 	}
 	if err := pem.Encode(file, pemBlock); err != nil {
 		return nil, err
 	}
-	return x509.ParseCertificateRequest(csrBytes)
+	return x509.ParseCertificateRequest(derBytes)
 }
 
-// create a CSR using the same parameters as Keychain Access would produce
-func newCSR(priv *rsa.PrivateKey, ou string, locality string, province string, country string, cname, org string) ([]byte, error) {
-	subj := pkix.Name{
-		CommonName: cname,
+// returns nil or []string{input} to populate pkix.Name.Subject
+func subjOrNil(input string) []string {
+	if input == "" {
+		return nil
 	}
-	if len(org) > 0 {
-		subj.Organization = []string{org}
-	}
-	if len(ou) > 0 {
-		subj.OrganizationalUnit = []string{ou}
-	}
-	if len(province) > 0 {
-		subj.Province = []string{province}
-	}
-	if len(locality) > 0 {
-		subj.Locality = []string{locality}
-	}
-	if len(country) > 0 {
-		subj.Country = []string{country}
-	}
-	template := &x509.CertificateRequest{
-		Subject: subj,
-	}
-	return x509.CreateCertificateRequest(rand.Reader, template, priv)
+	return []string{input}
 }
 
 // convert DER to PEM format
@@ -78,8 +77,7 @@ func pemCSR(derBytes []byte) []byte {
 		Headers: nil,
 		Bytes:   derBytes,
 	}
-	out := pem.EncodeToMemory(pemBlock)
-	return out
+	return pem.EncodeToMemory(pemBlock)
 }
 
 // load PEM encoded CSR from file

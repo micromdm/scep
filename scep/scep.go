@@ -10,12 +10,12 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
 	"encoding/base64"
 	"math/big"
 
 	"github.com/fullsailor/pkcs7"
+	"github.com/micromdm/scep/crypto/x509util"
 	"github.com/pkg/errors"
 )
 
@@ -132,7 +132,6 @@ var (
 	oidSCEPsenderNonce    = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 5}
 	oidSCEPrecipientNonce = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 6}
 	oidSCEPtransactionID  = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 7}
-	oidChallengePassword  = asn1.ObjectIdentifier{1, 2, 840, 113549, 1, 9, 7}
 )
 
 // PKIMessage defines the possible SCEP message types
@@ -268,117 +267,6 @@ func (msg *PKIMessage) parseMessageType() error {
 	}
 }
 
-type publicKeyInfo struct {
-	Raw       asn1.RawContent
-	Algorithm pkix.AlgorithmIdentifier
-	PublicKey asn1.BitString
-}
-
-type tbsCertificateRequest struct {
-	Raw           asn1.RawContent
-	Version       int
-	Subject       asn1.RawValue
-	PublicKey     publicKeyInfo
-	RawAttributes []asn1.RawValue `asn1:"tag:0"`
-}
-
-type certificateRequest struct {
-	Raw                asn1.RawContent
-	TBSCSR             tbsCertificateRequest
-	SignatureAlgorithm pkix.AlgorithmIdentifier
-	SignatureValue     asn1.BitString
-}
-
-// stdlib ignores the challengePassword attribute in csr
-func parseChallengePassword(asn1Data []byte) (string, error) {
-	type attribute struct {
-		ID    asn1.ObjectIdentifier
-		Value asn1.RawValue `asn1:"set"`
-	}
-	var csr certificateRequest
-	rest, err := asn1.Unmarshal(asn1Data, &csr)
-	if err != nil {
-		return "", err
-	} else if len(rest) != 0 {
-		err = asn1.SyntaxError{Msg: "trailing data"}
-		return "", err
-	}
-
-	var password string
-	for _, rawAttr := range csr.TBSCSR.RawAttributes {
-		var attr attribute
-		_, err := asn1.Unmarshal(rawAttr.FullBytes, &attr)
-		if err != nil {
-			return "", err
-		}
-		if attr.ID.Equal(oidChallengePassword) {
-			_, err := asn1.Unmarshal(attr.Value.Bytes, &password)
-			if err != nil {
-				return "", err
-			}
-		}
-	}
-
-	return password, nil
-}
-
-// AddChallenge adds a challenge password to the CSR
-func addChallenge(csr *x509.CertificateRequest, challenge string) ([]byte, error) {
-	// unmarshal csr
-	var req certificateRequest
-	rest, err := asn1.Unmarshal(csr.Raw, &req)
-	if err != nil {
-		return nil, err
-	} else if len(rest) != 0 {
-		err = asn1.SyntaxError{Msg: "trailing data"}
-		return nil, err
-	}
-
-	passwordAttribute := pkix.AttributeTypeAndValue{
-		Type:  oidChallengePassword,
-		Value: []byte(challenge),
-	}
-	b, err := asn1.Marshal(passwordAttribute)
-
-	var rawAttribute asn1.RawValue
-	rest, err = asn1.Unmarshal(b, &rawAttribute)
-	if err != nil {
-		return nil, err
-	} else if len(rest) != 0 {
-		err = asn1.SyntaxError{Msg: "trailing data"}
-		return nil, err
-	}
-
-	// append attribute
-	req.TBSCSR.RawAttributes = append(req.TBSCSR.RawAttributes, rawAttribute)
-
-	// recreate request
-	tbsCSR := tbsCertificateRequest{
-		Version:       0,
-		Subject:       req.TBSCSR.Subject,
-		PublicKey:     req.TBSCSR.PublicKey,
-		RawAttributes: req.TBSCSR.RawAttributes,
-	}
-
-	tbsCSRContents, err := asn1.Marshal(tbsCSR)
-	if err != nil {
-		return nil, err
-	}
-	tbsCSR.Raw = tbsCSRContents
-
-	// marshal csr with challenge password
-	csrBytes, err := asn1.Marshal(certificateRequest{
-		TBSCSR:             tbsCSR,
-		SignatureAlgorithm: req.SignatureAlgorithm,
-		SignatureValue:     req.SignatureValue,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return csrBytes, nil
-}
-
 // DecryptPKIEnvelope decrypts the pkcs envelopedData inside the SCEP PKIMessage
 func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.PrivateKey) error {
 	p7, err := pkcs7.Parse(msg.p7.Content)
@@ -404,9 +292,9 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 			return err
 		}
 		// check for challengePassword
-		cp, err := parseChallengePassword(msg.pkiEnvelope)
+		cp, err := x509util.ParseChallengePassword(msg.pkiEnvelope)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "scep: parse challenge password in pkiEnvelope")
 		}
 		msg.CSRReqMessage = &CSRReqMessage{
 			CSR:               csr,
@@ -534,17 +422,8 @@ func CACerts(data []byte) ([]*x509.Certificate, error) {
 
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
 func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage, error) {
-	csrBytes := csr.Raw
-	if tmpl.CSRReqMessage != nil {
-		if tmpl.ChallengePassword != "" {
-			b, err := addChallenge(csr, tmpl.ChallengePassword)
-			if err != nil {
-				return nil, err
-			}
-			csrBytes = b
-		}
-	}
-	e7, err := pkcs7.Encrypt(csrBytes, tmpl.Recipients)
+	derBytes := csr.Raw
+	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients)
 	if err != nil {
 		return nil, err
 	}
