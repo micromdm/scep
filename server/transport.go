@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 
@@ -19,12 +20,14 @@ import (
 func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http.Handler {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(logger),
-		kithttp.ServerBefore(updateContext),
 		kithttp.ServerFinalizer(logutil.NewHTTPLogger(logger).LoggingFinalizer),
 	}
 
+	var scepEndpoint endpoint.Endpoint
+	scepEndpoint = makeSCEPEndpoint(svc)
+	scepEndpoint = EndpointLoggingMiddleware(logger)(scepEndpoint)
 	scepHandler := kithttp.NewServer(
-		makeSCEPEndpoint(svc),
+		scepEndpoint,
 		decodeSCEPRequest,
 		encodeSCEPResponse,
 		opts...,
@@ -33,14 +36,6 @@ func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http
 	mux := http.NewServeMux()
 	mux.Handle("/scep", scepHandler)
 	return mux
-}
-
-func updateContext(ctx context.Context, r *http.Request) context.Context {
-	q := r.URL.Query()
-	if _, ok := q["operation"]; ok {
-		ctx = context.WithValue(ctx, "operation", q.Get("operation"))
-	}
-	return ctx
 }
 
 // EncodeSCEPRequest encodes a SCEP HTTP Request. Used by the client.
@@ -73,16 +68,18 @@ func EncodeSCEPRequest(ctx context.Context, r *http.Request, request interface{}
 	}
 }
 
-// DecodeSCEPRequest decodes an HTTP request to the SCEP server
-// extracting the Operation and Message.
+const maxPayloadSize = 2 << 20
+
 func decodeSCEPRequest(ctx context.Context, r *http.Request) (interface{}, error) {
 	msg, err := message(r)
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 
 	request := SCEPRequest{
-		Message: msg,
+		Message:   msg,
+		Operation: r.URL.Query().Get("operation"),
 	}
 
 	return request, nil
@@ -99,7 +96,7 @@ func message(r *http.Request) ([]byte, error) {
 		}
 		return []byte(msg), nil
 	case "POST":
-		return ioutil.ReadAll(r.Body)
+		return ioutil.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
 	default:
 		return nil, errors.New("method not supported")
 	}
@@ -109,27 +106,34 @@ func message(r *http.Request) ([]byte, error) {
 func encodeSCEPResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
 	resp := response.(SCEPResponse)
 	if resp.Err != nil {
-		fmt.Println(resp.Err)
-		return resp.Err
+		http.Error(w, resp.Err.Error(), http.StatusInternalServerError)
+		return nil
 	}
-	w.Header().Set("Content-Type", contentHeader(ctx, resp.CACertNum))
+	w.Header().Set("Content-Type", contentHeader(resp.operation, resp.CACertNum))
 	w.Write(resp.Data)
 	return nil
 }
 
 // DecodeSCEPResponse decodes a SCEP response
 func DecodeSCEPResponse(ctx context.Context, r *http.Response) (interface{}, error) {
-	data, err := ioutil.ReadAll(r.Body)
+	if r.StatusCode != http.StatusOK && r.StatusCode >= 400 {
+		return nil, fmt.Errorf("http request failed with status %s, msg: %s",
+			r.Status,
+			io.LimitReader(r.Body, 4096),
+		)
+	}
+	data, err := ioutil.ReadAll(io.LimitReader(r.Body, maxPayloadSize))
 	if err != nil {
 		return nil, err
 	}
+	defer r.Body.Close()
 	resp := SCEPResponse{
 		Data: data,
 	}
 	header := r.Header.Get("Content-Type")
 	if header == certChainHeader {
-		// TODO decode the response instead of just passing []byte around
-		// 0 or 1
+		// we only set it to two to indicate a cert chain.
+		// the actual number of certs will be in the payload.
 		resp.CACertNum = 2
 	}
 	return resp, nil
@@ -141,8 +145,7 @@ const (
 	pkiOpHeader     = "application/x-pki-message"
 )
 
-func contentHeader(ctx context.Context, certNum int) string {
-	op := ctx.Value("operation")
+func contentHeader(op string, certNum int) string {
 	switch op {
 	case "GetCACert":
 		if certNum > 1 {
@@ -158,32 +161,18 @@ func contentHeader(ctx context.Context, certNum int) string {
 
 func makeSCEPEndpoint(svc Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		op := ctx.Value("operation")
-		if op == nil {
-			return SCEPResponse{Err: errors.New("unknown operation")}, nil
-		}
 		req := request.(SCEPRequest)
-		switch op {
+		resp := SCEPResponse{operation: req.Operation}
+		switch req.Operation {
 		case "GetCACaps":
-			caps, err := svc.GetCACaps(ctx)
-			if err != nil {
-				return SCEPResponse{Err: err}, nil
-			}
-			return SCEPResponse{Data: caps}, nil
+			resp.Data, resp.Err = svc.GetCACaps(ctx)
 		case "GetCACert":
-			cert, certNum, err := svc.GetCACert(ctx)
-			if err != nil {
-				return SCEPResponse{Err: err, CACertNum: certNum}, nil
-			}
-			return SCEPResponse{Data: cert}, nil
+			resp.Data, resp.CACertNum, resp.Err = svc.GetCACert(ctx)
 		case "PKIOperation":
-			resp, err := svc.PKIOperation(ctx, req.Message)
-			if err != nil {
-				return SCEPResponse{Err: err}, nil
-			}
-			return SCEPResponse{Data: resp}, nil
+			resp.Data, resp.Err = svc.PKIOperation(ctx, req.Message)
 		default:
 			return nil, errors.New("operation not implemented")
 		}
+		return resp, nil
 	}
 }
