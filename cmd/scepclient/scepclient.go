@@ -6,14 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"log"
+	stdlog "log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode"
 
+	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
 	"github.com/pkg/errors"
@@ -42,17 +42,6 @@ type runCfg struct {
 	challenge    string
 	serverURL    string
 	caMD5        string
-}
-
-func isAsciiPrintableTo(s string) int {
-	count := 0
-	for _, r := range s {
-		count = count + 1
-		if r > unicode.MaxLatin1 || !unicode.IsPrint(r) {
-			return count - 1
-		}
-	}
-	return count - 1
 }
 
 func run(cfg runCfg) error {
@@ -92,11 +81,14 @@ func run(cfg runCfg) error {
 	}
 
 	ctx := context.Background()
-	var client scepclient.Client
+	var logger log.Logger
 	{
-		client = scepclient.NewClient(cfg.serverURL)
+		logger = log.NewLogfmtLogger(os.Stderr)
+		stdlog.SetOutput(log.NewStdlibAdapter(logger))
+		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 	}
 
+	client := scepclient.NewClient(cfg.serverURL, logger)
 	resp, certNum, err := client.GetCACert(ctx)
 	if err != nil {
 		return err
@@ -187,11 +179,11 @@ func run(cfg runCfg) error {
 		case scep.FAILURE:
 			return errors.Errorf("%s request failed, failInfo: %s", msgType, respMsg.FailInfo)
 		case scep.PENDING:
-			log.Println("pkiStatus PENDING: sleeping for 30 seconds, then trying again.")
+			logger.Log("pkiStatus", "PENDING", "msg", "sleeping for 30 seconds, then trying again.")
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		log.Println("pkiStatus SUCCESS: server returned a certificate.")
+		logger.Log("pkiStatus", "SUCCESS", "msg", "server returned a certificate.")
 		break // on scep.SUCCESS
 	}
 

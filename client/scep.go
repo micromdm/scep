@@ -7,6 +7,7 @@ import (
 	"net/url"
 
 	"github.com/go-kit/kit/endpoint"
+	"github.com/go-kit/kit/log"
 	httptransport "github.com/go-kit/kit/transport/http"
 	"github.com/micromdm/scep/server"
 	"golang.org/x/net/context"
@@ -33,24 +34,35 @@ func (c *client) Supports(cap string) bool {
 }
 
 // NewClient returns a SCEP service that's backed by the provided Endpoint
-func NewClient(baseURL string) Client {
+func NewClient(baseURL string, logger log.Logger) Client {
 	scepURL, _ := url.Parse(baseURL)
 	httpc := http.DefaultClient
-	return &client{
-		getRemote: httptransport.NewClient(
+	var getRemote endpoint.Endpoint
+	{
+		getRemote = httptransport.NewClient(
 			"GET",
 			scepURL,
 			scepserver.EncodeSCEPRequest,
 			scepserver.DecodeSCEPResponse,
 			httptransport.SetClient(httpc),
-		).Endpoint(),
-		postRemote: httptransport.NewClient(
+		).Endpoint()
+		getRemote = scepserver.EndpointLoggingMiddleware(logger)(getRemote)
+	}
+
+	var postRemote endpoint.Endpoint
+	{
+		postRemote = httptransport.NewClient(
 			"POST",
 			scepURL,
 			scepserver.EncodeSCEPRequest,
 			scepserver.DecodeSCEPResponse,
 			httptransport.SetClient(httpc),
-		).Endpoint(),
+		).Endpoint()
+		postRemote = scepserver.EndpointLoggingMiddleware(logger)(postRemote)
+	}
+	return &client{
+		getRemote:  getRemote,
+		postRemote: postRemote,
 	}
 }
 
