@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/micromdm/scep/challenge"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
 	"golang.org/x/net/context"
@@ -39,25 +40,36 @@ type Service interface {
 }
 
 type service struct {
-	depot             depot.Depot
-	ca                []*x509.Certificate // CA cert or chain
-	caKey             *rsa.PrivateKey
-	caKeyPassword     []byte
-	csrTemplate       *x509.Certificate
-	challengePassword string
-	allowRenewal      int // days before expiry, 0 to disable
-	clientValidity    int // client cert validity in days
+	depot                   depot.Depot
+	ca                      []*x509.Certificate // CA cert or chain
+	caKey                   *rsa.PrivateKey
+	caKeyPassword           []byte
+	csrTemplate             *x509.Certificate
+	challengePassword       string
+	supportDynamciChallenge bool
+	dynamicChallengeStore   challenge.Store
+	allowRenewal            int // days before expiry, 0 to disable
+	clientValidity          int // client cert validity in days
 
 	/// info logging is implemented in the service middleware layer.
 	debugLogger log.Logger
 }
 
-func (svc service) GetCACaps(ctx context.Context) ([]byte, error) {
+// SCEPChallenge returns a brand new, random dynamic challenge.
+func (svc *service) SCEPChallenge() (string, error) {
+	if !svc.supportDynamciChallenge {
+		return svc.challengePassword, nil
+	}
+
+	return svc.dynamicChallengeStore.SCEPChallenge()
+}
+
+func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
 	defaultCaps := []byte("SHA-1\nPOSTPKIOperation")
 	return defaultCaps, nil
 }
 
-func (svc service) GetCACert(ctx context.Context) ([]byte, int, error) {
+func (svc *service) GetCACert(ctx context.Context) ([]byte, int, error) {
 	if len(svc.ca) == 0 {
 		return nil, 0, errors.New("missing CA Cert")
 	}
@@ -68,7 +80,7 @@ func (svc service) GetCACert(ctx context.Context) ([]byte, int, error) {
 	return data, len(svc.ca), err
 }
 
-func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
+func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
 	msg, err := scep.ParsePKIMessage(data)
 	if err != nil {
 		return nil, err
@@ -135,7 +147,6 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 	}
 
 	return certRep.Raw, nil
-
 }
 
 func certName(crt *x509.Certificate) string {
@@ -145,18 +156,28 @@ func certName(crt *x509.Certificate) string {
 	return string(crt.Signature)
 }
 
-func (svc service) GetNextCACert(ctx context.Context) ([]byte, error) {
+func (svc *service) GetNextCACert(ctx context.Context) ([]byte, error) {
 	panic("not implemented")
 }
 
-func (svc service) challengePasswordMatch(pw string) bool {
-	if svc.challengePassword == "" {
+func (svc *service) challengePasswordMatch(pw string) bool {
+	if svc.challengePassword == "" && !svc.supportDynamciChallenge {
 		// empty password, don't validate
 		return true
 	}
-	if svc.challengePassword == pw {
+	if !svc.supportDynamciChallenge && svc.challengePassword == pw {
 		return true
 	}
+
+	if svc.supportDynamciChallenge {
+		valid, err := svc.dynamicChallengeStore.HasChallenge(pw)
+		if err != nil {
+			svc.debugLogger.Log(err)
+			return false
+		}
+		return valid
+	}
+
 	return false
 }
 
@@ -202,6 +223,14 @@ func ClientValidity(duration int) ServiceOption {
 func WithLogger(logger log.Logger) ServiceOption {
 	return func(s *service) error {
 		s.debugLogger = logger
+		return nil
+	}
+}
+
+func WithDynamicChallenges(cache challenge.Store) ServiceOption {
+	return func(s *service) error {
+		s.supportDynamciChallenge = true
+		s.dynamicChallengeStore = cache
 		return nil
 	}
 }
