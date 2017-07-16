@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fullsailor/pkcs7"
 	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
@@ -45,6 +46,21 @@ type runCfg struct {
 }
 
 func run(cfg runCfg) error {
+	ctx := context.Background()
+	var logger log.Logger
+	{
+		logger = log.NewLogfmtLogger(os.Stderr)
+		stdlog.SetOutput(log.NewStdlibAdapter(logger))
+		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+	}
+
+	client := scepclient.NewClient(cfg.serverURL, logger)
+
+	sigAlgo := x509.SHA1WithRSA
+	if client.Supports("SHA-256") || client.Supports("SCEPStandard") {
+		sigAlgo = x509.SHA256WithRSA
+	}
+
 	key, err := loadOrMakeKey(cfg.keyPath, cfg.keyBits)
 	if err != nil {
 		return err
@@ -59,6 +75,7 @@ func run(cfg runCfg) error {
 		province:  cfg.province,
 		challenge: cfg.challenge,
 		key:       key,
+		sigAlgo:   sigAlgo,
 	}
 
 	csr, err := loadOrMakeCSR(cfg.csrPath, opts)
@@ -80,15 +97,6 @@ func run(cfg runCfg) error {
 		self = s
 	}
 
-	ctx := context.Background()
-	var logger log.Logger
-	{
-		logger = log.NewLogfmtLogger(os.Stderr)
-		stdlog.SetOutput(log.NewStdlibAdapter(logger))
-		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
-	}
-
-	client := scepclient.NewClient(cfg.serverURL, logger)
 	resp, certNum, err := client.GetCACert(ctx)
 	if err != nil {
 		return err
@@ -141,11 +149,17 @@ func run(cfg runCfg) error {
 		recipients = r
 	}
 
+	var algo int
+	if client.Supports("AES") || client.Supports("SCEPStandard") {
+		algo = pkcs7.EncryptionAlgorithmAES128GCM
+	}
+
 	tmpl := &scep.PKIMessage{
-		MessageType: msgType,
-		Recipients:  recipients,
-		SignerKey:   key,
-		SignerCert:  signerCert,
+		MessageType:             msgType,
+		Recipients:              recipients,
+		SignerKey:               key,
+		SignerCert:              signerCert,
+		SCEPEncryptionAlgorithm: algo,
 	}
 
 	if cfg.challenge != "" && msgType == scep.PKCSReq {

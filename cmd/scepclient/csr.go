@@ -20,6 +20,7 @@ const (
 type csrOptions struct {
 	cn, org, country, ou, locality, province, challenge string
 	key                                                 *rsa.PrivateKey
+	sigAlgo                                             x509.SignatureAlgorithm
 }
 
 func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, error) {
@@ -42,9 +43,8 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 	}
 	template := x509util.CertificateRequest{
 		CertificateRequest: x509.CertificateRequest{
-			Subject: subject,
-			// TODO: https://github.com/micromdm/scep/issues/46
-			SignatureAlgorithm: x509.SHA1WithRSA,
+			Subject:            subject,
+			SignatureAlgorithm: opts.sigAlgo,
 		},
 	}
 	if opts.challenge != "" {

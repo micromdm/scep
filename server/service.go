@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -65,7 +64,7 @@ func (svc *service) SCEPChallenge() (string, error) {
 }
 
 func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
-	defaultCaps := []byte("SHA-1\nPOSTPKIOperation")
+	defaultCaps := []byte("SHA-1\nSHA-256\nAES\nDES3\nSCEPStandard\nPOSTPKIOperation")
 	return defaultCaps, nil
 }
 
@@ -121,6 +120,7 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageClientAuth,
 		},
+		SignatureAlgorithm: csr.SignatureAlgorithm,
 	}
 
 	certRep, err := msg.SignCSR(ca, svc.caKey, tmpl)
@@ -134,12 +134,9 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	// Test if this certificate is already in the CADB, revoke if needed
 	// revocation is done if the validity of the existing certificate is
 	// less than allowRenewal (14 days by default)
-	hasCN, err := svc.depot.HasCN(name, svc.allowRenewal, crt, false)
+	_, err = svc.depot.HasCN(name, svc.allowRenewal, crt, false)
 	if err != nil {
 		return nil, err
-	}
-	if !hasCN {
-		return nil, fmt.Errorf("scep service: no certificate %s", name)
 	}
 
 	if err := svc.depot.Put(name, crt); err != nil {
