@@ -316,6 +316,65 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	}
 }
 
+func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, info FailInfo) (*PKIMessage, error) {
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			pkcs7.Attribute{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPpkiStatus,
+				Value: FAILURE,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPfailInfo,
+				Value: info,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPmessageType,
+				Value: CertRep,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	sd, err := pkcs7.NewSignedData(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// sign the attributes
+	if err := sd.AddSigner(crtAuth, keyAuth, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := sd.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      FAILURE,
+		FailInfo:       BadRequest,
+		RecipientNonce: RecipientNonce(msg.SenderNonce),
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
+
+}
+
 // SignCSR creates an x509.Certificate based on a template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
 func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
