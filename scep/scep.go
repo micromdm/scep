@@ -157,6 +157,8 @@ type PKIMessage struct {
 	// Signer info
 	SignerKey  *rsa.PrivateKey
 	SignerCert *x509.Certificate
+
+	SCEPEncryptionAlgorithm int
 }
 
 // CertRepMessage is a type of PKIMessage
@@ -278,6 +280,12 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 		return err
 	}
 
+	algo, err := p7.EncryptionAlgorithm()
+	if err != nil {
+		return err
+	}
+	msg.SCEPEncryptionAlgorithm = algo
+
 	switch msg.MessageType {
 	case CertRep:
 		certs, err := CACerts(msg.pkiEnvelope)
@@ -335,7 +343,7 @@ func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 	}
 
 	// encrypt degenerate data using the original messages recipients
-	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates)
+	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates, pkcs7.WithEncryptionAlgorithm(msg.SCEPEncryptionAlgorithm))
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +431,7 @@ func CACerts(data []byte) ([]*x509.Certificate, error) {
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
 func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage, error) {
 	derBytes := csr.Raw
-	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients)
+	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients, pkcs7.WithEncryptionAlgorithm(tmpl.SCEPEncryptionAlgorithm))
 	if err != nil {
 		return nil, err
 	}
