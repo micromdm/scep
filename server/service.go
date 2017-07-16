@@ -92,7 +92,12 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	// validate challenge passwords
 	if msg.MessageType == scep.PKCSReq {
 		if !svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword) {
-			return nil, errors.New("scep challenge password does not match")
+			svc.debugLogger.Log("err", "scep challenge password does not match")
+			certRep, err := msg.Fail(ca, svc.caKey, scep.BadRequest)
+			if err != nil {
+				return nil, err
+			}
+			return certRep.Raw, nil
 		}
 	}
 
