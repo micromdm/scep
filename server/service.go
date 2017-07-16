@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -121,9 +122,12 @@ func (svc service) PKIOperation(ctx context.Context, data []byte) ([]byte, error
 	// Test if this certificate is already in the CADB, revoke if needed
 	// revocation is done if the validity of the existing certificate is
 	// less than allowRenewal (14 days by default)
-	err = svc.depot.HasCN(name, svc.allowRenewal, crt, false)
+	hasCN, err := svc.depot.HasCN(name, svc.allowRenewal, crt, false)
 	if err != nil {
 		return nil, err
+	}
+	if !hasCN {
+		return nil, fmt.Errorf("scep service: no certificate %s", name)
 	}
 
 	if err := svc.depot.Put(name, crt); err != nil {

@@ -1,6 +1,7 @@
 package bolt
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
@@ -169,9 +170,27 @@ func (db *Depot) incrementSerial(s *big.Int) error {
 	return err
 }
 
-func (db *Depot) HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error {
-	// FIXME: not implemented.
-	return nil
+func (db *Depot) HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) (bool, error) {
+	// TODO: implement allowTime
+	// TODO: implement revocation
+	if cert == nil {
+		return false, errors.New("nil certificate provided")
+	}
+	var hasCN bool
+	err := db.View(func(tx *bolt.Tx) error {
+		// TODO: "scep_certificates" is internal const in micromdm/scep
+		curs := tx.Bucket([]byte("scep_certificates")).Cursor()
+		prefix := []byte(cert.Subject.CommonName)
+		for k, v := curs.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, v = curs.Next() {
+			if bytes.Compare(v, cert.Raw) == 0 {
+				hasCN = true
+				return nil
+			}
+		}
+
+		return nil
+	})
+	return hasCN, err
 }
 
 func (db *Depot) CreateOrLoadKey(bits int) (*rsa.PrivateKey, error) {

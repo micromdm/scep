@@ -165,22 +165,21 @@ func makeDn(cert *x509.Certificate) string {
 }
 
 // Determine if the cadb already has a valid certificate with the same name
-func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) error {
+func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) (bool, error) {
 
 	var addDB bytes.Buffer
-	var candidates map[string]string
-	candidates = make(map[string]string)
+	candidates := make(map[string]string)
 
 	dn := makeDn(cert)
 
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
-		return err
+		return false, err
 	}
 
 	name := d.path("index.txt")
 	file, err := os.Open(name)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer file.Close()
 
@@ -201,11 +200,11 @@ func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revo
 			} else if strings.HasPrefix(line, "V\t") {
 				issueDate, err := strconv.Atoi(strings.Replace(strings.Split(line, "\t")[1], "Z", "", 1))
 				if err != nil {
-					return errors.New("Could not get expiry date from ca db")
+					return false, errors.New("Could not get expiry date from ca db")
 				}
 				minimalRenewDate, err := strconv.Atoi(strings.Replace(makeOpenSSLTime(time.Now().AddDate(0, 0, allowTime).UTC()), "Z", "", 1))
 				if err != nil {
-					return errors.New("Could not calculate expiry date")
+					return false, errors.New("Could not calculate expiry date")
 				}
 				entries := strings.Split(line, "\t")
 				serial := strings.ToUpper(entries[3])
@@ -224,7 +223,7 @@ func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revo
 	file.Close()
 	for key, value := range candidates {
 		if value == "no" {
-			return errors.New("DN " + dn + " already exists")
+			return false, errors.New("DN " + dn + " already exists")
 		}
 		if revokeOldCertificate {
 			fmt.Println("Revoking certificate with serial " + key + " from DB. Recreation of CRL needed.")
@@ -233,18 +232,18 @@ func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revo
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return err
+		return false, err
 	}
 	if revokeOldCertificate {
 		file, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR, dbPerm)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if _, err := file.Write(addDB.Bytes()); err != nil {
-			return err
+			return false, err
 		}
 	}
-	return nil
+	return true, nil
 }
 
 func (d *fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
@@ -252,7 +251,7 @@ func (d *fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x
 	var dbEntry bytes.Buffer
 
 	// Revoke old certificate
-	if err := d.HasCN(cn, 0, cert, true); err != nil {
+	if _, err := d.HasCN(cn, 0, cert, true); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(d.dirPath, 0755); err != nil {
