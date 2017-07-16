@@ -15,9 +15,50 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	challengestore "github.com/micromdm/scep/challenge/bolt"
 	boltdepot "github.com/micromdm/scep/depot/bolt"
 	"github.com/micromdm/scep/scep"
 )
+
+func TestDynamicChallenge(t *testing.T) {
+	depot := createDB(0666, nil)
+	key, err := depot.CreateOrLoadKey(2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = depot.CreateOrLoadCA(key, 5, "MicroMDM", "US")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	challengeDepot := createChallengeStore(0666, nil)
+	opts := []ServiceOption{
+		ClientValidity(365),
+		WithDynamicChallenges(challengeDepot),
+	}
+	svc, err := NewService(depot, opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	challenger := svc.(interface {
+		SCEPChallenge() (string, error)
+	})
+	challenge, err := challenger.SCEPChallenge()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	impl := svc.(*service)
+	if !impl.challengePasswordMatch(challenge) {
+		t.Errorf("challenge password does not match")
+	}
+	if impl.challengePasswordMatch(challenge) {
+		t.Errorf("challenge password matched but should only be used once")
+	}
+
+}
 
 func TestCaCert(t *testing.T) {
 	depot := createDB(0666, nil)
@@ -107,6 +148,23 @@ func createDB(mode os.FileMode, options *bolt.Options) *boltdepot.Depot {
 		panic(err.Error())
 	}
 	d, err := boltdepot.NewBoltDepot(db)
+	if err != nil {
+		panic(err.Error())
+	}
+	return d
+}
+
+func createChallengeStore(mode os.FileMode, options *bolt.Options) *challengestore.Depot {
+	// Create temporary path.
+	f, _ := ioutil.TempFile("", "bolt-challenge-")
+	f.Close()
+	os.Remove(f.Name())
+
+	db, err := bolt.Open(f.Name(), mode, options)
+	if err != nil {
+		panic(err.Error())
+	}
+	d, err := challengestore.NewBoltDepot(db)
 	if err != nil {
 		panic(err.Error())
 	}
