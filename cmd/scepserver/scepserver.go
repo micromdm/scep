@@ -46,10 +46,9 @@ func main() {
 
 	//main flags
 	var (
-		flVersion   = flag.Bool("version", false, "prints version information")
-		flPort      = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
-		flDepotPath = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
-		//  TODO : how to submit non string passwords?
+		flVersion           = flag.Bool("version", false, "prints version information")
+		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
+		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
 		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
