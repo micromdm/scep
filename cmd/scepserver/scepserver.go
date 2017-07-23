@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -167,7 +168,7 @@ func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error)
 	if err := os.MkdirAll(depot, 0755); err != nil {
 		return nil, err
 	}
-	name := depot + "/" + "ca.key"
+	name := filepath.Join(depot, "ca.key")
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
 	if err != nil {
 		return nil, err
@@ -255,7 +256,7 @@ func createCertificateAuthority(key *rsa.PrivateKey, years int, organization str
 		return err
 	}
 
-	name := depot + "/" + "ca.pem"
+	name := filepath.Join(depot, "ca.pem")
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
 	if err != nil {
 		return err
