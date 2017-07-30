@@ -25,7 +25,6 @@ import (
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/depot/file"
 	"github.com/micromdm/scep/server"
-	"golang.org/x/net/context"
 )
 
 // version info
@@ -71,7 +70,6 @@ func main() {
 		os.Exit(0)
 	}
 	port := ":" + *flPort
-	ctx := context.Background()
 
 	var logger log.Logger
 	{
@@ -117,7 +115,10 @@ func main() {
 
 	var h http.Handler // http handler
 	{
-		h = scepserver.ServiceHandler(ctx, svc, log.With(logger, "component", "http"))
+		e := scepserver.MakeServerEndpoints(svc)
+		e.GetEndpoint = scepserver.EndpointLoggingMiddleware(logger)(e.GetEndpoint)
+		e.PostEndpoint = scepserver.EndpointLoggingMiddleware(logger)(e.PostEndpoint)
+		h = scepserver.MakeHTTPHandler(e, svc, log.With(logger, "component", "http"))
 	}
 
 	// start http server

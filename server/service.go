@@ -1,6 +1,7 @@
 package scepserver
 
 import (
+	"context"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -14,7 +15,6 @@ import (
 	"github.com/micromdm/scep/challenge"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
-	"golang.org/x/net/context"
 )
 
 // Service is the interface for all supported SCEP server operations.

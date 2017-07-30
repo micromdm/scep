@@ -1,12 +1,154 @@
 package scepserver
 
 import (
+	"bytes"
 	"context"
+	"net/url"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/log"
+	httptransport "github.com/go-kit/kit/transport/http"
+	"github.com/pkg/errors"
 )
+
+// possible SCEP operations
+const (
+	getCACaps     = "GetCACaps"
+	getCACert     = "GetCACert"
+	pkiOperation  = "PKIOperation"
+	getNextCACert = "GetNextCACert"
+)
+
+type Endpoints struct {
+	GetEndpoint  endpoint.Endpoint
+	PostEndpoint endpoint.Endpoint
+
+	mtx          sync.RWMutex
+	capabilities []byte
+}
+
+func (e *Endpoints) GetCACaps(ctx context.Context) ([]byte, error) {
+	request := SCEPRequest{Operation: getCACaps}
+	response, err := e.GetEndpoint(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	resp := response.(SCEPResponse)
+
+	e.mtx.Lock()
+	e.capabilities = resp.Data
+	e.mtx.Unlock()
+
+	return resp.Data, resp.Err
+}
+
+func (e *Endpoints) Supports(cap string) bool {
+	e.mtx.RLock()
+	defer e.mtx.RUnlock()
+
+	if len(e.capabilities) == 0 {
+		e.mtx.RUnlock()
+		e.GetCACaps(context.Background())
+		e.mtx.RLock()
+	}
+	return bytes.Contains(e.capabilities, []byte(cap))
+}
+
+func (e *Endpoints) GetCACert(ctx context.Context) ([]byte, int, error) {
+	request := SCEPRequest{Operation: getCACert}
+	response, err := e.GetEndpoint(ctx, request)
+	if err != nil {
+		return nil, 0, err
+	}
+	resp := response.(SCEPResponse)
+	return resp.Data, resp.CACertNum, resp.Err
+}
+
+func (e *Endpoints) PKIOperation(ctx context.Context, msg []byte) ([]byte, error) {
+	var ee endpoint.Endpoint
+	if e.Supports("POSTPKIOperation") || e.Supports("SCEPStandard") {
+		ee = e.PostEndpoint
+	} else {
+		ee = e.GetEndpoint
+	}
+
+	request := SCEPRequest{Operation: pkiOperation, Message: msg}
+	response, err := ee(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	resp := response.(SCEPResponse)
+	return resp.Data, resp.Err
+}
+
+func (e *Endpoints) GetNextCACert(ctx context.Context) ([]byte, error) {
+	var request SCEPRequest
+	response, err := e.GetEndpoint(ctx, request)
+	if err != nil {
+		return nil, err
+	}
+	resp := response.(SCEPResponse)
+	return resp.Data, resp.Err
+}
+
+func MakeServerEndpoints(svc Service) *Endpoints {
+	e := MakeSCEPEndpoint(svc)
+	return &Endpoints{
+		GetEndpoint:  e,
+		PostEndpoint: e,
+	}
+}
+
+// MakeClientEndpoints returns an Endpoints struct where each endpoint invokes
+// the corresponding method on the remote instance, via a transport/http.Client.
+// Useful in a SCEP client.
+func MakeClientEndpoints(instance string) (*Endpoints, error) {
+	if !strings.HasPrefix(instance, "http") {
+		instance = "http://" + instance
+	}
+	tgt, err := url.Parse(instance)
+	if err != nil {
+		return nil, err
+	}
+
+	options := []httptransport.ClientOption{}
+
+	return &Endpoints{
+		GetEndpoint: httptransport.NewClient(
+			"GET",
+			tgt,
+			EncodeSCEPRequest,
+			DecodeSCEPResponse,
+			options...).Endpoint(),
+		PostEndpoint: httptransport.NewClient(
+			"POST",
+			tgt,
+			EncodeSCEPRequest,
+			DecodeSCEPResponse,
+			options...).Endpoint(),
+	}, nil
+}
+
+func MakeSCEPEndpoint(svc Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (interface{}, error) {
+		req := request.(SCEPRequest)
+		resp := SCEPResponse{operation: req.Operation}
+		switch req.Operation {
+		case "GetCACaps":
+			resp.Data, resp.Err = svc.GetCACaps(ctx)
+		case "GetCACert":
+			resp.Data, resp.CACertNum, resp.Err = svc.GetCACert(ctx)
+		case "PKIOperation":
+			resp.Data, resp.Err = svc.PKIOperation(ctx, req.Message)
+		default:
+			return nil, errors.New("operation not implemented")
+		}
+		return resp, nil
+	}
+}
 
 // SCEPRequest is a SCEP server request.
 type SCEPRequest struct {
