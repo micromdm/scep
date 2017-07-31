@@ -80,7 +80,7 @@ func (svc *service) GetCACert(ctx context.Context) ([]byte, int, error) {
 }
 
 func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
-	msg, err := scep.ParsePKIMessage(data)
+	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(svc.debugLogger))
 	if err != nil {
 		return nil, err
 	}

@@ -180,7 +180,7 @@ func EndpointLoggingMiddleware(logger log.Logger) endpoint.Middleware {
 			if oper, ok := request.(interface {
 				scepOperation() string
 			}); ok {
-				keyvals = append(keyvals, "method", oper.scepOperation())
+				keyvals = append(keyvals, "op", oper.scepOperation())
 			}
 			defer func(begin time.Time) {
 				logger.Log(append(keyvals, "error", err, "took", time.Since(begin))...)

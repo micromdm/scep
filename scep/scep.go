@@ -15,8 +15,11 @@ import (
 	"math/big"
 
 	"github.com/fullsailor/pkcs7"
-	"github.com/micromdm/scep/crypto/x509util"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+
+	"github.com/micromdm/scep/crypto/x509util"
 )
 
 // errors
@@ -134,6 +137,20 @@ var (
 	oidSCEPtransactionID  = asn1.ObjectIdentifier{2, 16, 840, 1, 113733, 1, 9, 7}
 )
 
+// WithLogger adds option logging to the SCEP operations.
+func WithLogger(logger log.Logger) Option {
+	return func(c *config) {
+		c.logger = logger
+	}
+}
+
+// Option specifies custom configuration for SCEP.
+type Option func(*config)
+
+type config struct {
+	logger log.Logger
+}
+
 // PKIMessage defines the possible SCEP message types
 type PKIMessage struct {
 	TransactionID
@@ -159,6 +176,8 @@ type PKIMessage struct {
 	SignerCert *x509.Certificate
 
 	SCEPEncryptionAlgorithm int
+
+	logger log.Logger
 }
 
 // CertRepMessage is a type of PKIMessage
@@ -184,7 +203,12 @@ type CSRReqMessage struct {
 }
 
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
-func ParsePKIMessage(data []byte) (*PKIMessage, error) {
+func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
+	conf := &config{logger: log.NewNopLogger()}
+	for _, opt := range opts {
+		opt(conf)
+	}
+
 	// parse PKCS#7 signed data
 	p7, err := pkcs7.Parse(data)
 	if err != nil {
@@ -206,7 +230,16 @@ func ParsePKIMessage(data []byte) (*PKIMessage, error) {
 		MessageType:   msgType,
 		Raw:           data,
 		p7:            p7,
+		logger:        conf.logger,
 	}
+
+	// log relevant key-values when parsing a pkiMessage.
+	logKeyVals := []interface{}{
+		"msg", "parsed scep pkiMessage",
+		"scep_message_type", msgType,
+		"transaction_id", tID,
+	}
+	level.Debug(msg.logger).Log(logKeyVals...)
 
 	if err := msg.parseMessageType(); err != nil {
 		return nil, err
@@ -286,6 +319,12 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	}
 	msg.SCEPEncryptionAlgorithm = algo
 
+	logKeyVals := []interface{}{
+		"msg", "decrypt pkiEnvelope",
+		"encryption_algorithm", algo,
+	}
+	defer func() { level.Debug(msg.logger).Log(logKeyVals...) }()
+
 	switch msg.MessageType {
 	case CertRep:
 		certs, err := CACerts(msg.pkiEnvelope)
@@ -293,6 +332,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 			return err
 		}
 		msg.CertRepMessage.Certificate = certs[0]
+		logKeyVals = append(logKeyVals, "ca_certs", len(certs))
 		return nil
 	case PKCSReq, UpdateReq, RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
@@ -308,6 +348,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 			CSR:               csr,
 			ChallengePassword: cp,
 		}
+		logKeyVals = append(logKeyVals, "has_challenge", cp != "")
 		return nil
 	case GetCRL, GetCert, CertPoll:
 		return errNotImplemented
@@ -488,7 +529,12 @@ func CACerts(data []byte) ([]*x509.Certificate, error) {
 }
 
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
-func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage, error) {
+func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Option) (*PKIMessage, error) {
+	conf := &config{logger: log.NewNopLogger()}
+	for _, opt := range opts {
+		opt(conf)
+	}
+
 	derBytes := csr.Raw
 	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients, pkcs7.WithEncryptionAlgorithm(tmpl.SCEPEncryptionAlgorithm))
 	if err != nil {
@@ -510,6 +556,13 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage,
 	if err != nil {
 		return nil, err
 	}
+
+	level.Debug(conf.logger).Log(
+		"msg", "creating SCEP CSR request",
+		"transaction_id", tID,
+		"encryption_algorithm", tmpl.SCEPEncryptionAlgorithm,
+		"signer_cn", tmpl.SignerCert.Subject.CommonName,
+	)
 
 	// PKIMessageAttributes to be signed
 	config := pkcs7.SignerInfoConfig{
@@ -549,6 +602,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage) (*PKIMessage,
 		TransactionID: tID,
 		SenderNonce:   sn,
 		CSRReqMessage: cr,
+		logger:        conf.logger,
 	}
 
 	return newMsg, nil

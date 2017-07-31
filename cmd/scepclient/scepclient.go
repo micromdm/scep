@@ -15,6 +15,7 @@ import (
 
 	"github.com/fullsailor/pkcs7"
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
 	"github.com/pkg/errors"
@@ -43,16 +44,26 @@ type runCfg struct {
 	challenge    string
 	serverURL    string
 	caMD5        string
+	debug        bool
+	logfmt       string
 }
 
 func run(cfg runCfg) error {
 	ctx := context.Background()
 	var logger log.Logger
 	{
-		logger = log.NewLogfmtLogger(os.Stderr)
+		if strings.ToLower(cfg.logfmt) == "json" {
+			logger = log.NewJSONLogger(os.Stderr)
+		} else {
+			logger = log.NewLogfmtLogger(os.Stderr)
+		}
 		stdlog.SetOutput(log.NewStdlibAdapter(logger))
 		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+		if !cfg.debug {
+			logger = level.NewFilter(logger, level.AllowInfo())
+		}
 	}
+	lginfo := level.Info(logger)
 
 	client, err := scepclient.New(cfg.serverURL, logger)
 	if err != nil {
@@ -171,7 +182,7 @@ func run(cfg runCfg) error {
 		}
 	}
 
-	msg, err := scep.NewCSRRequest(csr, tmpl)
+	msg, err := scep.NewCSRRequest(csr, tmpl, scep.WithLogger(logger))
 	if err != nil {
 		return errors.Wrap(err, "creating csr pkiMessage")
 	}
@@ -187,7 +198,7 @@ func run(cfg runCfg) error {
 			return errors.Wrapf(err, "PKIOperation for %s", msgType)
 		}
 
-		respMsg, err = scep.ParsePKIMessage(respBytes)
+		respMsg, err = scep.ParsePKIMessage(respBytes, scep.WithLogger(logger))
 		if err != nil {
 			return errors.Wrapf(err, "parsing pkiMessage response %s", msgType)
 		}
@@ -196,11 +207,11 @@ func run(cfg runCfg) error {
 		case scep.FAILURE:
 			return errors.Errorf("%s request failed, failInfo: %s", msgType, respMsg.FailInfo)
 		case scep.PENDING:
-			logger.Log("pkiStatus", "PENDING", "msg", "sleeping for 30 seconds, then trying again.")
+			lginfo.Log("pkiStatus", "PENDING", "msg", "sleeping for 30 seconds, then trying again.")
 			time.Sleep(30 * time.Second)
 			continue
 		}
-		logger.Log("pkiStatus", "SUCCESS", "msg", "server returned a certificate.")
+		lginfo.Log("pkiStatus", "SUCCESS", "msg", "server returned a certificate.")
 		break // on scep.SUCCESS
 	}
 
@@ -270,6 +281,9 @@ func main() {
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
 		flCAFingerprint = flag.String("ca-fingerprint", "", "md5 fingerprint of CA certificate for NDES server.")
+
+		flDebugLogging = flag.Bool("debug", false, "enable debug logging")
+		flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
 	)
 	flag.Parse()
 
@@ -291,6 +305,10 @@ func main() {
 	if *flCertPath == "" {
 		*flCertPath = dir + "/client.pem"
 	}
+	var logfmt string
+	if *flLogJSON {
+		logfmt = "json"
+	}
 
 	cfg := runCfg{
 		dir:          dir,
@@ -308,6 +326,8 @@ func main() {
 		challenge:    *flChallengePassword,
 		serverURL:    *flServerURL,
 		caMD5:        *flCAFingerprint,
+		debug:        *flDebugLogging,
+		logfmt:       logfmt,
 	}
 
 	if err := run(cfg); err != nil {
