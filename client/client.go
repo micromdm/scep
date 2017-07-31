@@ -2,6 +2,7 @@ package scepclient
 
 import (
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 
 	"github.com/micromdm/scep/server"
 )
@@ -21,6 +22,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+	logger = level.Info(logger)
 	endpoints.GetEndpoint = scepserver.EndpointLoggingMiddleware(logger)(endpoints.GetEndpoint)
 	endpoints.PostEndpoint = scepserver.EndpointLoggingMiddleware(logger)(endpoints.PostEndpoint)
 	return endpoints, nil

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/depot/file"
 	"github.com/micromdm/scep/server"
@@ -53,6 +54,8 @@ func main() {
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
 		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
+		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
+		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
 	)
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -73,28 +76,37 @@ func main() {
 
 	var logger log.Logger
 	{
-		logger = log.NewLogfmtLogger(os.Stderr)
+
+		if *flLogJSON {
+			logger = log.NewJSONLogger(os.Stderr)
+		} else {
+			logger = log.NewLogfmtLogger(os.Stderr)
+		}
+		if !*flDebug {
+			logger = level.NewFilter(logger, level.AllowInfo())
+		}
 		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 		logger = log.With(logger, "caller", log.DefaultCaller)
 	}
+	lginfo := level.Info(logger)
 
 	var err error
 	var depot depot.Depot // cert storage
 	{
 		depot, err = file.NewFileDepot(*flDepotPath)
 		if err != nil {
-			logger.Log("err", err)
+			lginfo.Log("err", err)
 			os.Exit(1)
 		}
 	}
 	allowRenewal, err := strconv.Atoi(*flClAllowRenewal)
 	if err != nil {
-		logger.Log("No valid number for allowed renewal time : ", err)
+		lginfo.Log("No valid number for allowed renewal time : ", err)
 		os.Exit(1)
 	}
 	clientValidity, err := strconv.Atoi(*flClDuration)
 	if err != nil {
-		logger.Log("No valid number for client cert validity : ", err)
+		lginfo.Log("No valid number for client cert validity : ", err)
 		os.Exit(1)
 	}
 	var svc scepserver.Service // scep service
@@ -104,27 +116,28 @@ func main() {
 			scepserver.CAKeyPassword([]byte(*flCAPass)),
 			scepserver.ClientValidity(clientValidity),
 			scepserver.AllowRenewal(allowRenewal),
+			scepserver.WithLogger(logger),
 		}
 		svc, err = scepserver.NewService(depot, svcOptions...)
 		if err != nil {
-			logger.Log("err", err)
+			lginfo.Log("err", err)
 			os.Exit(1)
 		}
-		svc = scepserver.NewLoggingService(log.With(logger, "component", "service"), svc)
+		svc = scepserver.NewLoggingService(log.With(lginfo, "component", "scep_service"), svc)
 	}
 
 	var h http.Handler // http handler
 	{
 		e := scepserver.MakeServerEndpoints(svc)
-		e.GetEndpoint = scepserver.EndpointLoggingMiddleware(logger)(e.GetEndpoint)
-		e.PostEndpoint = scepserver.EndpointLoggingMiddleware(logger)(e.PostEndpoint)
-		h = scepserver.MakeHTTPHandler(e, svc, log.With(logger, "component", "http"))
+		e.GetEndpoint = scepserver.EndpointLoggingMiddleware(lginfo)(e.GetEndpoint)
+		e.PostEndpoint = scepserver.EndpointLoggingMiddleware(lginfo)(e.PostEndpoint)
+		h = scepserver.MakeHTTPHandler(e, svc, log.With(lginfo, "component", "http"))
 	}
 
 	// start http server
 	errs := make(chan error, 2)
 	go func() {
-		logger.Log("transport", "http", "address", port, "msg", "listening")
+		lginfo.Log("transport", "http", "address", port, "msg", "listening")
 		errs <- http.ListenAndServe(port, h)
 	}()
 	go func() {
@@ -133,7 +146,7 @@ func main() {
 		errs <- fmt.Errorf("%s", <-c)
 	}()
 
-	logger.Log("terminated", <-errs)
+	lginfo.Log("terminated", <-errs)
 }
 
 func caMain(cmd *flag.FlagSet) int {
