@@ -2,6 +2,7 @@ package scepserver_test
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -14,7 +15,6 @@ import (
 	"testing"
 
 	kitlog "github.com/go-kit/kit/log"
-	"golang.org/x/net/context"
 
 	"github.com/micromdm/scep/depot"
 	filedepot "github.com/micromdm/scep/depot/file"

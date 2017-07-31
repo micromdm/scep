@@ -3,8 +3,8 @@
 all: build
 
 deps:
-	go get -u github.com/Masterminds/glide
-	glide install --strip-vendor
+	go get -u github.com/golang/dep/...
+	dep ensure -v
 
 .pre:
 	mkdir -p build
