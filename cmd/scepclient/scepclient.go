@@ -54,7 +54,10 @@ func run(cfg runCfg) error {
 		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
 	}
 
-	client := scepclient.NewClient(cfg.serverURL, logger)
+	client, err := scepclient.New(cfg.serverURL, logger)
+	if err != nil {
+		return err
+	}
 
 	sigAlgo := x509.SHA1WithRSA
 	if client.Supports("SHA-256") || client.Supports("SCEPStandard") {

@@ -9,33 +9,34 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/go-kit/kit/endpoint"
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
+	"github.com/gorilla/mux"
 	"github.com/groob/finalizer/logutil"
 	"github.com/pkg/errors"
 )
 
-// ServiceHandler is an HTTP Handler for a SCEP endpoint.
-func ServiceHandler(ctx context.Context, svc Service, logger kitlog.Logger) http.Handler {
+func MakeHTTPHandler(e *Endpoints, svc Service, logger kitlog.Logger) http.Handler {
 	opts := []kithttp.ServerOption{
 		kithttp.ServerErrorLogger(logger),
 		kithttp.ServerFinalizer(logutil.NewHTTPLogger(logger).LoggingFinalizer),
 	}
 
-	var scepEndpoint endpoint.Endpoint
-	scepEndpoint = makeSCEPEndpoint(svc)
-	scepEndpoint = EndpointLoggingMiddleware(logger)(scepEndpoint)
-	scepHandler := kithttp.NewServer(
-		scepEndpoint,
+	r := mux.NewRouter()
+	r.Methods("GET").Path("/scep").Handler(kithttp.NewServer(
+		e.GetEndpoint,
 		decodeSCEPRequest,
 		encodeSCEPResponse,
 		opts...,
-	)
+	))
+	r.Methods("POST").Path("/scep").Handler(kithttp.NewServer(
+		e.PostEndpoint,
+		decodeSCEPRequest,
+		encodeSCEPResponse,
+		opts...,
+	))
 
-	mux := http.NewServeMux()
-	mux.Handle("/scep", scepHandler)
-	return mux
+	return r
 }
 
 // EncodeSCEPRequest encodes a SCEP HTTP Request. Used by the client.
@@ -156,23 +157,5 @@ func contentHeader(op string, certNum int) string {
 		return pkiOpHeader
 	default:
 		return "text/plain"
-	}
-}
-
-func makeSCEPEndpoint(svc Service) endpoint.Endpoint {
-	return func(ctx context.Context, request interface{}) (interface{}, error) {
-		req := request.(SCEPRequest)
-		resp := SCEPResponse{operation: req.Operation}
-		switch req.Operation {
-		case "GetCACaps":
-			resp.Data, resp.Err = svc.GetCACaps(ctx)
-		case "GetCACert":
-			resp.Data, resp.CACertNum, resp.Err = svc.GetCACert(ctx)
-		case "PKIOperation":
-			resp.Data, resp.Err = svc.PKIOperation(ctx, req.Message)
-		default:
-			return nil, errors.New("operation not implemented")
-		}
-		return resp, nil
 	}
 }

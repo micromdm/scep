@@ -102,9 +102,9 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 			t.Fatal(err)
 		}
 	}
-	ctx := context.Background()
 	logger := kitlog.NewNopLogger()
-	handler := scepserver.ServiceHandler(ctx, svc, logger)
+	e := scepserver.MakeServerEndpoints(svc)
+	handler := scepserver.MakeHTTPHandler(e, svc, logger)
 	server := httptest.NewServer(handler)
 	return server, svc
 }
