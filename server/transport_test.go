@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	kitlog "github.com/go-kit/kit/log"
@@ -22,8 +23,8 @@ import (
 )
 
 func TestCACaps(t *testing.T) {
-	server, _ := newServer(t)
-	defer server.Close()
+	server, _, teardown := newServer(t)
+	defer teardown()
 	url := server.URL + "/scep?operation=GetCACaps"
 	resp, err := http.Get(url)
 	if err != nil {
@@ -72,8 +73,8 @@ func TestEncodePKCSReq_Request(t *testing.T) {
 }
 
 func TestPKIOperation(t *testing.T) {
-	server, _ := newServer(t)
-	defer server.Close()
+	server, _, teardown := newServer(t)
+	defer teardown()
 	pkcsreq := loadTestFile(t, "../scep/testdata/PKCSReq.der")
 	body := bytes.NewReader(pkcsreq)
 	url := server.URL + "/scep?operation=PKIOperation"
@@ -86,7 +87,7 @@ func TestPKIOperation(t *testing.T) {
 	}
 }
 
-func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server, scepserver.Service) {
+func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server, scepserver.Service, func()) {
 	var err error
 	var depot depot.Depot // cert storage
 	{
@@ -94,6 +95,7 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 		if err != nil {
 			t.Fatal(err)
 		}
+		depot = &noopDepot{depot}
 	}
 	var svc scepserver.Service // scep service
 	{
@@ -106,7 +108,18 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 	e := scepserver.MakeServerEndpoints(svc)
 	handler := scepserver.MakeHTTPHandler(e, svc, logger)
 	server := httptest.NewServer(handler)
-	return server, svc
+	teardown := func() {
+		server.Close()
+		os.Remove("../scep/testdata/testca/serial")
+		os.Remove("../scep/testdata/testca/index.txt")
+	}
+	return server, svc, teardown
+}
+
+type noopDepot struct{ depot.Depot }
+
+func (d *noopDepot) Put(name string, crt *x509.Certificate) error {
+	return nil
 }
 
 /* helpers */
