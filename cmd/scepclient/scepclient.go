@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/x509"
 	"flag"
@@ -18,7 +19,6 @@ import (
 	"github.com/micromdm/scep/client"
 	"github.com/micromdm/scep/scep"
 	"github.com/pkg/errors"
-	"golang.org/x/net/context"
 )
 
 // version info
