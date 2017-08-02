@@ -26,7 +26,7 @@ scepserver -depot depot -port 2016 -challenge=secret
 
 # in a separate terminal window, run a client
 # note, if the client.key doesn't exist, the client will create a new rsa private key. Must be in PEM format.
-scepclient -private-key client.key -server-url=http://scep.groob.io:2016 -challenge=secret
+scepclient -private-key client.key -server-url=http://scep.groob.io:2016/scep -challenge=secret
 ```
 # Server Usage
 
