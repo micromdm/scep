@@ -24,9 +24,13 @@ scepserver ca -init
 # start server
 scepserver -depot depot -port 2016 -challenge=secret
 
+# SCEP request:
 # in a separate terminal window, run a client
 # note, if the client.key doesn't exist, the client will create a new rsa private key. Must be in PEM format.
-scepclient -private-key client.key -server-url=http://scep.groob.io:2016 -challenge=secret
+scepclient -private-key client.key -server-url=http://scep.groob.io:2016/scep -challenge=secret
+
+# NDES request:
+scepclient -private-key client.key -server-url=http://scep.groob.io:2016/certsrv/mscep/ -ca-fingerprint="81C827D2 3DAAF3B4 73999632 67609B30"
 ```
 # Server Usage
 
@@ -34,6 +38,14 @@ The default flags configure and run the scep server.
 depot must be the path to a folder with `ca.pem` and `ca.key` files. 
 
 If you don't already have a CA to use, you can create one using the `scep ca` subcommand.
+
+The server currently has two endpoints:
+- /scep
+- /certsrv/mscep
+
+To obtain a signed SCEP certificate, you will use the /scep endpoint.
+
+To obtain a certificate through Network Device Enrollment Service (NDES), use the /certsrv/mscep endpoint. You will need to add the `ca-fingerprint` client argument during this request.
 
 ```
 Usage of ./cmd/scepserver/scepserver:
@@ -69,6 +81,7 @@ Usage of ./cmd/scepserver/scepserver ca:
 
 # Client Usage
 
+
 ```
 Usage of scepclient:
   -certificate string
@@ -90,6 +103,8 @@ Usage of scepclient:
   -version
     	prints version information
 ```
+
+Note: Make sure to specify the desired endpoint in your `-server-url` value (e.g. `'http://scep.groob.io:2016/scep'`)
 
 # Docker
 ```
