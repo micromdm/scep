@@ -268,7 +268,10 @@ func (d *fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x
 	// Format of the caDB, see http://pki-tutorial.readthedocs.io/en/latest/cadb.html
 	//   STATUSFLAG  EXPIRATIONDATE  REVOCATIONDATE(or emtpy)	SERIAL_IN_HEX   CERTFILENAME_OR_'unknown'   Certificate_DN
 
-	serialHex := strings.ToUpper(fmt.Sprintf("%x", cert.SerialNumber))
+	serialHex := fmt.Sprintf("%X", cert.SerialNumber)
+	if len(serialHex)%2 == 1 {
+		serialHex = fmt.Sprintf("0%s", serialHex)
+	}
 
 	validDate := makeOpenSSLTime(cert.NotAfter)
 
