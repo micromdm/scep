@@ -15,6 +15,7 @@ import (
 	"github.com/micromdm/scep/challenge"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
+	"github.com/micromdm/scep/validator"
 )
 
 // Service is the interface for all supported SCEP server operations.
@@ -47,6 +48,7 @@ type service struct {
 	challengePassword       string
 	supportDynamciChallenge bool
 	dynamicChallengeStore   challenge.Store
+	validator               validator.Validator
 	allowRenewal            int // days before expiry, 0 to disable
 	clientValidity          int // client cert validity in days
 
@@ -91,8 +93,21 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 
 	// validate challenge passwords
 	if msg.MessageType == scep.PKCSReq {
-		if !svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword) {
+		CSRIsValid := true
+
+		if svc.validator != nil {
+			result, err := svc.validator.Verify(msg.CSRReqMessage.Raw)
+			if err != nil {
+				return nil, err
+			}
+			CSRIsValid = result
+		} else if !svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword) {
 			svc.debugLogger.Log("err", "scep challenge password does not match")
+			CSRIsValid = false
+		}
+
+		if !CSRIsValid {
+			svc.debugLogger.Log("err", "CSR is not valid")
 			certRep, err := msg.Fail(ca, svc.caKey, scep.BadRequest)
 			if err != nil {
 				return nil, err
@@ -185,6 +200,15 @@ func (svc *service) challengePasswordMatch(pw string) bool {
 
 // ServiceOption is a server configuration option
 type ServiceOption func(*service) error
+
+// WithValidator is an option argument to NewService
+// which allows setting a CSR validator.
+func WithValidator(validator validator.Validator) ServiceOption {
+	return func(s *service) error {
+		s.validator = validator
+		return nil
+	}
+}
 
 // ChallengePassword is an optional argument to NewService
 // which allows setting a preshared key for SCEP.

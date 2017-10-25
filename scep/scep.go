@@ -196,6 +196,8 @@ type CertRepMessage struct {
 // The content of this message is protected
 // by the recipient public key(example CA)
 type CSRReqMessage struct {
+	Raw []byte
+
 	// PKCS#10 Certificate request inside the envelope
 	CSR *x509.CertificateRequest
 
@@ -345,6 +347,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 			return errors.Wrap(err, "scep: parse challenge password in pkiEnvelope")
 		}
 		msg.CSRReqMessage = &CSRReqMessage{
+			Raw:               msg.pkiEnvelope,
 			CSR:               csr,
 			ChallengePassword: cp,
 		}
