@@ -28,7 +28,7 @@
 [[constraint]]
   branch = "sha256"
   name = "github.com/fullsailor/pkcs7"
-  source = "git@github.com:groob/pkcs7"
+  source = "github.com/groob/pkcs7"
 
 [[constraint]]
   name = "github.com/go-kit/kit"
