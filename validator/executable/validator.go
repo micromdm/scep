@@ -4,11 +4,15 @@ import (
 	"os/exec"
 )
 
-type ExecutableValidator struct {
+func NewExecutableValidator(path string) (*executableValidator, error) {
+	return &executableValidator{executable: path}, nil
+}
+
+type executableValidator struct {
 	executable string
 }
 
-func (v ExecutableValidator) Verify(data []byte) (bool, error) {
+func (v *executableValidator) Verify(data []byte) (bool, error) {
 	cmd := exec.Command(v.executable)
 
 	stdin, err := cmd.StdinPipe()
