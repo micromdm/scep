@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+
+	"github.com/go-kit/kit/log"
 )
 
 const (
@@ -14,7 +16,7 @@ const (
 )
 
 // New creates a executablecsrverifier.ExecutableCSRVerifier.
-func New(path string) (*ExecutableCSRVerifier, error) {
+func New(path string, logger log.Logger) (*ExecutableCSRVerifier, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -30,7 +32,7 @@ func New(path string) (*ExecutableCSRVerifier, error) {
 		return nil, errors.New("CSR Verifier executable is not executable")
 	}
 
-	return &ExecutableCSRVerifier{executable: path}, nil
+	return &ExecutableCSRVerifier{executable: path, logger: logger}, nil
 }
 
 // ExecutableCSRVerifier implements a csrverifier.CSRVerifier.
@@ -39,6 +41,7 @@ func New(path string) (*ExecutableCSRVerifier, error) {
 // In any other cases, the CSR is considered invalid.
 type ExecutableCSRVerifier struct {
 	executable string
+	logger     log.Logger
 }
 
 func (v *ExecutableCSRVerifier) Verify(data []byte) (bool, error) {
@@ -56,6 +59,7 @@ func (v *ExecutableCSRVerifier) Verify(data []byte) (bool, error) {
 
 	err = cmd.Run()
 	if err != nil {
+		v.logger.Log("ERROR", err)
 		// mask the executable error
 		return false, nil
 	}

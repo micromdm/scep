@@ -114,7 +114,7 @@ func main() {
 	}
 	var csrVerifier csrverifier.CSRVerifier
 	if *flCSRVerifierExec > "" {
-		executableCSRVerifier, err := executablecsrverifier.New(*flCSRVerifierExec)
+		executableCSRVerifier, err := executablecsrverifier.New(*flCSRVerifierExec, lginfo)
 		if err != nil {
 			lginfo.Log("Could not instantiate CSR verifier : ", err)
 			os.Exit(1)
