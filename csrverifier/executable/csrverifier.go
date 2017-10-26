@@ -1,3 +1,4 @@
+// Package executablecsrverifier defines the ExecutableCSRVerifier csrverifier.CSRVerifier.
 package executablecsrverifier
 
 import (
@@ -7,11 +8,12 @@ import (
 )
 
 const (
-	UserExecute os.FileMode = 1 << (6 - 3*iota)
-	GroupExecute
-	OtherExecute
+	userExecute os.FileMode = 1 << (6 - 3*iota)
+	groupExecute
+	otherExecute
 )
 
+// New creates a executablecsrverifier.ExecutableCSRVerifier.
 func New(path string) (*ExecutableCSRVerifier, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
@@ -24,13 +26,17 @@ func New(path string) (*ExecutableCSRVerifier, error) {
 	}
 
 	filePerm := fileMode.Perm()
-	if filePerm&(UserExecute|GroupExecute|OtherExecute) == 0 {
+	if filePerm&(userExecute|groupExecute|otherExecute) == 0 {
 		return nil, errors.New("CSR Verifier executable is not executable")
 	}
 
 	return &ExecutableCSRVerifier{executable: path}, nil
 }
 
+// ExecutableCSRVerifier implements a csrverifier.CSRVerifier.
+// It executes a command, and passes it the raw decrypted CSR.
+// If the command exit code is 0, the CSR is considered valid.
+// In any other cases, the CSR is considered invalid.
 type ExecutableCSRVerifier struct {
 	executable string
 }
