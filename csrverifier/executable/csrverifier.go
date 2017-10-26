@@ -59,7 +59,7 @@ func (v *ExecutableCSRVerifier) Verify(data []byte) (bool, error) {
 
 	err = cmd.Run()
 	if err != nil {
-		v.logger.Log("ERROR", err)
+		v.logger.Log("err", err)
 		// mask the executable error
 		return false, nil
 	}
