@@ -23,11 +23,11 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/micromdm/scep/csrverifier"
+	"github.com/micromdm/scep/csrverifier/executable"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/depot/file"
 	"github.com/micromdm/scep/server"
-	"github.com/micromdm/scep/validator"
-	"github.com/micromdm/scep/validator/executable"
 )
 
 // version info
@@ -56,7 +56,7 @@ func main() {
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
 		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
-		flCSRValidationExec = flag.String("csrvalidationexec", envString("SCEP_CSR_VALIDATION_EXEC", ""), "will be passed the CSRs for verification")
+		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
 	)
@@ -112,21 +112,21 @@ func main() {
 		lginfo.Log("No valid number for client cert validity : ", err)
 		os.Exit(1)
 	}
-	var validator validator.Validator
-	if *flCSRValidationExec > "" {
-		execval, err := executablevalidator.NewExecutableValidator(*flCSRValidationExec)
+	var csrVerifier csrverifier.CSRVerifier
+	if *flCSRVerifierExec > "" {
+		executableCSRVerifier, err := executablecsrverifier.New(*flCSRVerifierExec)
 		if err != nil {
-			lginfo.Log("Could not instantiate CSR validateor : ", err)
+			lginfo.Log("Could not instantiate CSR verifier : ", err)
 			os.Exit(1)
 		}
-		validator = execval
+		csrVerifier = executableCSRVerifier
 	}
 
 	var svc scepserver.Service // scep service
 	{
 		svcOptions := []scepserver.ServiceOption{
 			scepserver.ChallengePassword(*flChallengePassword),
-			scepserver.WithValidator(validator),
+			scepserver.WithCSRVerifier(csrVerifier),
 			scepserver.CAKeyPassword([]byte(*flCAPass)),
 			scepserver.ClientValidity(clientValidity),
 			scepserver.AllowRenewal(allowRenewal),
