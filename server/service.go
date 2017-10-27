@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/challenge"
+	"github.com/micromdm/scep/csrverifier"
 	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
 )
@@ -47,6 +48,7 @@ type service struct {
 	challengePassword       string
 	supportDynamciChallenge bool
 	dynamicChallengeStore   challenge.Store
+	csrVerifier             csrverifier.CSRVerifier
 	allowRenewal            int // days before expiry, 0 to disable
 	clientValidity          int // client cert validity in days
 
@@ -91,8 +93,25 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 
 	// validate challenge passwords
 	if msg.MessageType == scep.PKCSReq {
-		if !svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword) {
-			svc.debugLogger.Log("err", "scep challenge password does not match")
+		CSRIsValid := false
+
+		if svc.csrVerifier != nil {
+			result, err := svc.csrVerifier.Verify(msg.CSRReqMessage.RawDecrypted)
+			if err != nil {
+				return nil, err
+			}
+			CSRIsValid = result
+			if !CSRIsValid {
+				svc.debugLogger.Log("err", "CSR is not valid")
+			}
+		} else {
+			CSRIsValid = svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword)
+			if !CSRIsValid {
+				svc.debugLogger.Log("err", "scep challenge password does not match")
+			}
+		}
+
+		if !CSRIsValid {
 			certRep, err := msg.Fail(ca, svc.caKey, scep.BadRequest)
 			if err != nil {
 				return nil, err
@@ -185,6 +204,15 @@ func (svc *service) challengePasswordMatch(pw string) bool {
 
 // ServiceOption is a server configuration option
 type ServiceOption func(*service) error
+
+// WithCSRVerifier is an option argument to NewService
+// which allows setting a CSR verifier.
+func WithCSRVerifier(csrVerifier csrverifier.CSRVerifier) ServiceOption {
+	return func(s *service) error {
+		s.csrVerifier = csrVerifier
+		return nil
+	}
+}
 
 // ChallengePassword is an optional argument to NewService
 // which allows setting a preshared key for SCEP.
