@@ -247,7 +247,7 @@ func createCertificateAuthority(key *rsa.PrivateKey, years int, organization str
 			NotBefore: time.Now().Add(-600).UTC(),
 			NotAfter:  time.Time{},
 			// Used for certificate signing only
-			KeyUsage: x509.KeyUsageCertSign,
+			KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 
 			ExtKeyUsage:        nil,
 			UnknownExtKeyUsage: nil,
