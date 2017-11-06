@@ -6,6 +6,11 @@ RUN apk --no-cache add curl unzip && \
     unzip -p /scep.zip build/scepserver-linux-amd64 > /scep && \
     rm /scep.zip && \
     chmod a+x /scep && \
-    apk del curl unzip
+    apk del curl unzip && \
+    echo 'b4af438c2cb0f9dda7a8253e49f6c9ec71492ebfe85c25334c16ed4a0499ebc4  scep' | sha256sum -c
 
+EXPOSE 8080
+VOLUME ["/depot"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+	CMD wget -t1 -O /dev/null http://localhost:8080/scep?operation=GetCACaps || exit 1
 CMD ["/scep"]
