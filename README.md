@@ -15,9 +15,9 @@ To compile the SCEP client and server, there are a few requirements.
     `make build`
 The binaries will be compiled in the `build/` folder.
 
-
 # Example
-minimal example for both server and client
+Minimal example for both server and client.
+
 ```
 # create a new CA
 scepserver ca -init
@@ -30,8 +30,10 @@ scepserver -depot depot -port 2016 -challenge=secret
 scepclient -private-key client.key -server-url=http://scep.groob.io:2016/scep -challenge=secret
 
 # NDES request:
-scepclient -private-key client.key -server-url=http://scep.groob.io:2016/certsrv/mscep/ -ca-fingerprint="81C827D2 3DAAF3B4 73999632 67609B30"
+# note, this should point to an NDES server, scepserver does not provide NDES.
+scepclient -private-key client.key -server-url=https://scep.example.com:4321/certsrv/mscep/ -ca-fingerprint="81C827D2 3DAAF3B4 73999632 67609B30"
 ```
+
 # Server Usage
 
 The default flags configure and run the scep server.  
@@ -39,20 +41,26 @@ depot must be the path to a folder with `ca.pem` and `ca.key` files.
 
 If you don't already have a CA to use, you can create one using the `scep ca` subcommand.
 
-The server currently has two endpoints:
-- /scep
-- /certsrv/mscep
-
-To obtain a signed SCEP certificate, you will use the /scep endpoint.
-
-To obtain a certificate through Network Device Enrollment Service (NDES), use the /certsrv/mscep endpoint. You will need to add the `ca-fingerprint` client argument during this request.
+The scepserver currently provides one HTTP endpoint `/scep`.
 
 ```
 Usage of ./cmd/scepserver/scepserver:
+  -allowrenew string
+    	do not allow renewal until n days before expiry, set to 0 to always allow (default "14")
+  -capass string
+    	passwd for the ca.key
   -challenge string
     	enforce a challenge password
+  -crtvalid string
+    	validity for new client certificates in days (default "365")
+  -csrverifierexec string
+    	will be passed the CSRs for verification
+  -debug
+    	enable debug logging
   -depot string
     	path to ca folder (default "depot")
+  -log-json
+    	output JSON logs
   -port string
     	port to listen on (default "8080")
   -version
@@ -81,9 +89,10 @@ Usage of ./cmd/scepserver/scepserver ca:
 
 # Client Usage
 
-
 ```
 Usage of scepclient:
+  -ca-fingerprint string
+    	md5 fingerprint of CA certificate for NDES server.
   -certificate string
     	certificate path, if there is no key, scepclient will create one
   -challenge string
@@ -92,12 +101,22 @@ Usage of scepclient:
     	common name for certificate (default "scepclient")
   -country string
     	country code in certificate (default "US")
+  -debug
+    	enable debug logging
   -keySize int
     	rsa key size (default 2048)
+  -locality string
+    	locality for certificate
+  -log-json
+    	use JSON for log output
   -organization string
     	organization for cert (default "scep-client")
+  -ou string
+    	organizational unit for certificate (default "MDM")
   -private-key string
     	private key path, if there is no key, scepclient will create one
+  -province string
+    	province for certificate
   -server-url string
     	SCEP server url
   -version
@@ -105,6 +124,9 @@ Usage of scepclient:
 ```
 
 Note: Make sure to specify the desired endpoint in your `-server-url` value (e.g. `'http://scep.groob.io:2016/scep'`)
+
+To obtain a certificate through Network Device Enrollment Service (NDES), set `-server-url` to a server that provides NDES.
+This most likely uses the `/certsrv/mscep` path instead. You will need to add the `-ca-fingerprint` client argument during this request.
 
 # Docker
 ```
