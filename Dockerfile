@@ -11,6 +11,4 @@ RUN apk --no-cache add curl unzip && \
 
 EXPOSE 8080
 VOLUME ["/depot"]
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-	CMD wget -t1 -O /dev/null http://localhost:8080/scep?operation=GetCACaps || exit 1
 CMD ["/scep"]
