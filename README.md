@@ -130,12 +130,13 @@ This most likely uses the `/certsrv/mscep` path instead. You will need to add th
 
 # Docker
 ```
-docker pull micromdm/scep
+docker build -t micromdm/scep:latest .
+
 # create CA
-docker run -it --rm -v /path/to/ca/folder:/depot micromdm/scep ./scep ca -init
+docker run -it --rm -v /path/to/ca/folder:/depot micromdm/scep:latest ca -init
 
 # run
-docker run -it --rm -v /path/to/ca/folder:/depot -p 8080:8080 micromdm/scep
+docker run -it --rm -v /path/to/ca/folder:/depot -p 8080:8080 micromdm/scep:latest
 ```
 
 # SCEP library
