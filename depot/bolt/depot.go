@@ -266,7 +266,7 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 		StreetAddress:      nil,
 		PostalCode:         nil,
 		SerialNumber:       "",
-		CommonName:         "",
+		CommonName:         org,
 	}
 
 	subjectKeyID, err := generateSubjectKeyID(&key.PublicKey)
