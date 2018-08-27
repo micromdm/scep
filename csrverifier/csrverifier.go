@@ -3,5 +3,5 @@ package csrverifier
 
 // Verify the raw decrypted CSR.
 type CSRVerifier interface {
-	Verify(data []byte) (bool, error)
+	Verify(transactionID string, data []byte) (bool, error)
 }

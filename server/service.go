@@ -96,7 +96,7 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 		CSRIsValid := false
 
 		if svc.csrVerifier != nil {
-			result, err := svc.csrVerifier.Verify(msg.CSRReqMessage.RawDecrypted)
+			result, err := svc.csrVerifier.Verify(string(msg.TransactionID), msg.CSRReqMessage.RawDecrypted)
 			if err != nil {
 				return nil, err
 			}

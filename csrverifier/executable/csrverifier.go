@@ -44,8 +44,9 @@ type ExecutableCSRVerifier struct {
 	logger     log.Logger
 }
 
-func (v *ExecutableCSRVerifier) Verify(data []byte) (bool, error) {
+func (v *ExecutableCSRVerifier) Verify(transactionID string, data []byte) (bool, error) {
 	cmd := exec.Command(v.executable)
+	cmd.Env = append(os.Environ(), "TRANSACTIONID="+transactionID)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
