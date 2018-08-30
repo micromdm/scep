@@ -19,7 +19,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
 
-	"github.com/micromdm/scep/crypto/x509util"
+	"github.com/syncsynchalt/scep/crypto/x509util"
 )
 
 // errors

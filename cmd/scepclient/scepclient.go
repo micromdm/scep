@@ -17,8 +17,8 @@ import (
 	"github.com/fullsailor/pkcs7"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/micromdm/scep/client"
-	"github.com/micromdm/scep/scep"
+	"github.com/syncsynchalt/scep/client"
+	"github.com/syncsynchalt/scep/scep"
 	"github.com/pkg/errors"
 )
 
