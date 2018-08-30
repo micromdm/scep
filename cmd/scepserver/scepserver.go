@@ -104,19 +104,19 @@ func main() {
 	}
 	allowRenewal, err := strconv.Atoi(*flClAllowRenewal)
 	if err != nil {
-		lginfo.Log("No valid number for allowed renewal time : ", err)
+		lginfo.Log("err", "No valid number for allowed renewal time : ", err)
 		os.Exit(1)
 	}
 	clientValidity, err := strconv.Atoi(*flClDuration)
 	if err != nil {
-		lginfo.Log("No valid number for client cert validity : ", err)
+		lginfo.Log("err", "No valid number for client cert validity : ", err)
 		os.Exit(1)
 	}
 	var csrVerifier csrverifier.CSRVerifier
 	if *flCSRVerifierExec > "" {
 		executableCSRVerifier, err := executablecsrverifier.New(*flCSRVerifierExec, lginfo)
 		if err != nil {
-			lginfo.Log("Could not instantiate CSR verifier : ", err)
+			lginfo.Log("err", "Could not instantiate CSR verifier : ", err)
 			os.Exit(1)
 		}
 		csrVerifier = executableCSRVerifier
