@@ -23,10 +23,12 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/syncsynchalt/scep/csrverifier"
-	"github.com/syncsynchalt/scep/csrverifier/executable"
+	"github.com/syncsynchalt/scep/certfailer"
+	"github.com/syncsynchalt/scep/certfailer/executable"
 	"github.com/syncsynchalt/scep/certsuccesser"
 	"github.com/syncsynchalt/scep/certsuccesser/executable"
+	"github.com/syncsynchalt/scep/csrverifier"
+	"github.com/syncsynchalt/scep/csrverifier/executable"
 	"github.com/syncsynchalt/scep/depot"
 	"github.com/syncsynchalt/scep/depot/file"
 	"github.com/syncsynchalt/scep/server"
@@ -60,6 +62,7 @@ func main() {
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
 		flCertSuccesserExec = flag.String("certsuccesserexec", envString("SCEP_CERT_SUCCESSER_EXEC", ""), "will be passed the certs on successful generation")
+		flCertFailerExec    = flag.String("certfailerexec", envString("SCEP_CERT_FAILER_EXEC", ""), "will be called for failure to generate cert")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
 	)
@@ -133,6 +136,15 @@ func main() {
 		}
 		certSuccesser = executableCertSuccesser
 	}
+	var certFailer certfailer.CertFailer
+	if *flCertSuccesserExec > "" {
+		executableCertFailer, err := executablecertfailer.New(*flCertFailerExec, lginfo)
+		if err != nil {
+			lginfo.Log("Could not instantiate cert failer : ", err)
+			os.Exit(1)
+		}
+		certFailer = executableCertFailer
+	}
 
 	var svc scepserver.Service // scep service
 	{
@@ -140,6 +152,7 @@ func main() {
 			scepserver.ChallengePassword(*flChallengePassword),
 			scepserver.WithCSRVerifier(csrVerifier),
 			scepserver.WithCertSuccesser(certSuccesser),
+			scepserver.WithCertFailer(certFailer),
 			scepserver.CAKeyPassword([]byte(*flCAPass)),
 			scepserver.ClientValidity(clientValidity),
 			scepserver.AllowRenewal(allowRenewal),

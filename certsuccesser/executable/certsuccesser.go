@@ -2,6 +2,7 @@
 package executablecertsuccesser
 
 import (
+	"bufio"
 	"errors"
 	"os"
 	"os/exec"
@@ -52,14 +53,40 @@ func (v *ExecutableCertSuccesser) Success(transactionID string, data []byte, cer
 	if err != nil {
 		return false, err
 	}
-
 	go func() {
 		defer stdin.Close()
 		stdin.Write(data)
 	}()
 
-	err = cmd.Run()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return false, err
+	}
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			v.logger.Log("info", "successer stdout: "+scanner.Text())
+		}
+	}()
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return false, err
+	}
+	go func() {
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			v.logger.Log("info", "successer stderr: "+scanner.Text())
+		}
+	}()
+
+	if err := cmd.Start(); err != nil {
+		v.logger.Log("err", err)
+		// mask the executable error
+		return false, nil
+	}
+
+	if err := cmd.Wait(); err != nil {
 		v.logger.Log("err", err)
 		// mask the executable error
 		return false, nil
