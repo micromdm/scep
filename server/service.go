@@ -14,6 +14,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/syncsynchalt/scep/challenge"
 	"github.com/syncsynchalt/scep/csrverifier"
+	"github.com/syncsynchalt/scep/certsuccesser"
 	"github.com/syncsynchalt/scep/depot"
 	"github.com/syncsynchalt/scep/scep"
 )
@@ -49,6 +50,7 @@ type service struct {
 	supportDynamciChallenge bool
 	dynamicChallengeStore   challenge.Store
 	csrVerifier             csrverifier.CSRVerifier
+	certSuccesser           certsuccesser.CertSuccesser
 	allowRenewal            int // days before expiry, 0 to disable
 	clientValidity          int // client cert validity in days
 
@@ -167,6 +169,21 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 		return nil, err
 	}
 
+	if svc.certSuccesser != nil {
+		certfile, err := svc.depot.CertFilename(name, crt)
+		if err != nil {
+			return nil, err
+		}
+		result, err := svc.certSuccesser.Success(string(msg.TransactionID), msg.CSRReqMessage.RawDecrypted, certfile)
+		if err != nil {
+			return nil, err
+		}
+		CertIsSuccessful := result
+		if !CertIsSuccessful {
+			svc.debugLogger.Log("err", "CertSuccesser denied the cert")
+		}
+	}
+
 	return certRep.Raw, nil
 }
 
@@ -210,6 +227,15 @@ type ServiceOption func(*service) error
 func WithCSRVerifier(csrVerifier csrverifier.CSRVerifier) ServiceOption {
 	return func(s *service) error {
 		s.csrVerifier = csrVerifier
+		return nil
+	}
+}
+
+// WithCertSuccesser is an option argument to NewService
+// which allows setting a cert successer.
+func WithCertSuccesser(certSuccesser certsuccesser.CertSuccesser) ServiceOption {
+	return func(s *service) error {
+		s.certSuccesser = certSuccesser
 		return nil
 	}
 }

@@ -25,6 +25,8 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/syncsynchalt/scep/csrverifier"
 	"github.com/syncsynchalt/scep/csrverifier/executable"
+	"github.com/syncsynchalt/scep/certsuccesser"
+	"github.com/syncsynchalt/scep/certsuccesser/executable"
 	"github.com/syncsynchalt/scep/depot"
 	"github.com/syncsynchalt/scep/depot/file"
 	"github.com/syncsynchalt/scep/server"
@@ -57,6 +59,7 @@ func main() {
 		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
+		flCertSuccesserExec = flag.String("certsuccesserexec", envString("SCEP_CERT_SUCCESSER_EXEC", ""), "will be passed the certs on successful generation")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
 	)
@@ -121,12 +124,22 @@ func main() {
 		}
 		csrVerifier = executableCSRVerifier
 	}
+	var certSuccesser certsuccesser.CertSuccesser
+	if *flCertSuccesserExec > "" {
+		executableCertSuccesser, err := executablecertsuccesser.New(*flCertSuccesserExec, lginfo)
+		if err != nil {
+			lginfo.Log("Could not instantiate cert successer : ", err)
+			os.Exit(1)
+		}
+		certSuccesser = executableCertSuccesser
+	}
 
 	var svc scepserver.Service // scep service
 	{
 		svcOptions := []scepserver.ServiceOption{
 			scepserver.ChallengePassword(*flChallengePassword),
 			scepserver.WithCSRVerifier(csrVerifier),
+			scepserver.WithCertSuccesser(certSuccesser),
 			scepserver.CAKeyPassword([]byte(*flCAPass)),
 			scepserver.ClientValidity(clientValidity),
 			scepserver.AllowRenewal(allowRenewal),

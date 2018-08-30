@@ -55,6 +55,10 @@ Usage of ./cmd/scepserver/scepserver:
     	validity for new client certificates in days (default "365")
   -csrverifierexec string
     	will be passed the CSRs for verification
+  -certsuccesserexec string
+    	will be passed the certs on successful generation
+  -certfailerexec string
+    	will be passed the certs on failed generation
   -debug
     	enable debug logging
   -depot string
