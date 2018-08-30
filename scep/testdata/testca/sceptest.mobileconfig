@@ -7,7 +7,7 @@
 		<dict>
 			<key>PayloadContent</key>
 			<dict>
-				<key>Key Type</key>
+				<key>KeyType</key>
 				<string>RSA</string>
 				<key>Keysize</key>
 				<integer>1024</integer>
