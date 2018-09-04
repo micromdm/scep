@@ -4,7 +4,7 @@ all: build
 
 deps:
 	go get -u github.com/golang/dep/...
-	dep ensure -v
+	dep ensure -update -v
 
 .pre:
 	mkdir -p build
