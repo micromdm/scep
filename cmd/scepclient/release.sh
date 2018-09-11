@@ -17,4 +17,4 @@ build() {
 }
 
 build "linux" "amd64"
-build "darwin" "amd64"
+#build "darwin" "amd64"
