@@ -4,12 +4,12 @@ all: build
 
 deps:
 	go get -u github.com/golang/dep/...
-	dep ensure -v
+	dep ensure -update -v
 
 .pre:
 	mkdir -p build
 
-build: build-scepclient build-scepserver
+build: build-scepserver build-scepclient
 
 build-scepclient: .pre
 	cd cmd/scepclient && ./release.sh

@@ -4,7 +4,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
-	"github.com/micromdm/scep/server"
+	"github.com/syncsynchalt/scep/server"
 )
 
 // Client is a SCEP Client

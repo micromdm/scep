@@ -12,10 +12,12 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/micromdm/scep/challenge"
-	"github.com/micromdm/scep/csrverifier"
-	"github.com/micromdm/scep/depot"
-	"github.com/micromdm/scep/scep"
+	"github.com/syncsynchalt/scep/certfailer"
+	"github.com/syncsynchalt/scep/certsuccesser"
+	"github.com/syncsynchalt/scep/challenge"
+	"github.com/syncsynchalt/scep/csrverifier"
+	"github.com/syncsynchalt/scep/depot"
+	"github.com/syncsynchalt/scep/scep"
 )
 
 // Service is the interface for all supported SCEP server operations.
@@ -49,6 +51,8 @@ type service struct {
 	supportDynamciChallenge bool
 	dynamicChallengeStore   challenge.Store
 	csrVerifier             csrverifier.CSRVerifier
+	certSuccesser           certsuccesser.CertSuccesser
+	certFailer              certfailer.CertFailer
 	allowRenewal            int // days before expiry, 0 to disable
 	clientValidity          int // client cert validity in days
 
@@ -91,13 +95,21 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 		return nil, err
 	}
 
+	var callbackErr error = nil
+	defer func() {
+		if callbackErr != nil && svc.certFailer != nil {
+			svc.certFailer.Fail(string(msg.TransactionID), msg.CSRReqMessage.RawDecrypted, callbackErr.Error())
+		}
+	}()
+
 	// validate challenge passwords
 	if msg.MessageType == scep.PKCSReq {
 		CSRIsValid := false
 
 		if svc.csrVerifier != nil {
-			result, err := svc.csrVerifier.Verify(msg.CSRReqMessage.RawDecrypted)
+			result, err := svc.csrVerifier.Verify(string(msg.TransactionID), msg.CSRReqMessage.RawDecrypted)
 			if err != nil {
+				callbackErr = err
 				return nil, err
 			}
 			CSRIsValid = result
@@ -114,6 +126,7 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 		if !CSRIsValid {
 			certRep, err := msg.Fail(ca, svc.caKey, scep.BadRequest)
 			if err != nil {
+				callbackErr = errors.New("CSR is not valid")
 				return nil, err
 			}
 			return certRep.Raw, nil
@@ -123,11 +136,13 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	csr := msg.CSRReqMessage.CSR
 	id, err := generateSubjectKeyID(csr.PublicKey)
 	if err != nil {
+		callbackErr = err
 		return nil, err
 	}
 
 	serial, err := svc.depot.Serial()
 	if err != nil {
+		callbackErr = err
 		return nil, err
 	}
 
@@ -149,6 +164,7 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 
 	certRep, err := msg.SignCSR(ca, svc.caKey, tmpl)
 	if err != nil {
+		callbackErr = err
 		return nil, err
 	}
 
@@ -160,11 +176,31 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	// less than allowRenewal (14 days by default)
 	_, err = svc.depot.HasCN(name, svc.allowRenewal, crt, false)
 	if err != nil {
+		callbackErr = err
 		return nil, err
 	}
 
 	if err := svc.depot.Put(name, crt); err != nil {
+		callbackErr = err
 		return nil, err
+	}
+
+	if svc.certSuccesser != nil {
+		certfile, err := svc.depot.CertFilename(name, crt)
+		if err != nil {
+			callbackErr = err
+			return nil, err
+		}
+		result, err := svc.certSuccesser.Success(string(msg.TransactionID), msg.CSRReqMessage.RawDecrypted, certfile)
+		if err != nil {
+			callbackErr = err
+			return nil, err
+		}
+		CertIsSuccessful := result
+		if !CertIsSuccessful {
+			callbackErr = errors.New("CertSuccesser denied the cert")
+			svc.debugLogger.Log("err", "CertSuccesser denied the cert")
+		}
 	}
 
 	return certRep.Raw, nil
@@ -210,6 +246,24 @@ type ServiceOption func(*service) error
 func WithCSRVerifier(csrVerifier csrverifier.CSRVerifier) ServiceOption {
 	return func(s *service) error {
 		s.csrVerifier = csrVerifier
+		return nil
+	}
+}
+
+// WithCertSuccesser is an option argument to NewService
+// which allows setting a cert successer.
+func WithCertSuccesser(certSuccesser certsuccesser.CertSuccesser) ServiceOption {
+	return func(s *service) error {
+		s.certSuccesser = certSuccesser
+		return nil
+	}
+}
+
+// WithCertFailer is an option argument to NewService
+// which allows setting a cert failer.
+func WithCertFailer(certFailer certfailer.CertFailer) ServiceOption {
+	return func(s *service) error {
+		s.certFailer = certFailer
 		return nil
 	}
 }

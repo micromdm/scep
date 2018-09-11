@@ -60,6 +60,17 @@ const (
 	dbPerm     = 0600
 )
 
+// Generate filename for a certificate in the depot
+func (d *fileDepot) CertFilename(cn string, crt *x509.Certificate) (string, error) {
+	if crt == nil {
+		return "", errors.New("crt is nil")
+	}
+
+	serial := crt.SerialNumber
+	filename := d.path(cn) + "." + serial.String() + ".pem"
+	return filename, nil
+}
+
 // Put adds a certificate to the depot
 func (d *fileDepot) Put(cn string, crt *x509.Certificate) error {
 	if crt == nil {
@@ -74,11 +85,7 @@ func (d *fileDepot) Put(cn string, crt *x509.Certificate) error {
 		return err
 	}
 
-	serial, err := d.Serial()
-	if err != nil {
-		return err
-	}
-
+	serial := crt.SerialNumber
 	name := d.path(cn) + "." + serial.String() + ".pem"
 	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, certPerm)
 	if err != nil {
@@ -319,7 +326,8 @@ func (d *fileDepot) writeSerial(serial *big.Int) error {
 
 // read serial and increment
 func (d *fileDepot) incrementSerial(s *big.Int) error {
-	serial := s.Add(s, big.NewInt(1))
+	serial := big.NewInt(0)
+	serial.Add(s, big.NewInt(1))
 	if err := d.writeSerial(serial); err != nil {
 		return err
 	}

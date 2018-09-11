@@ -1,5 +1,5 @@
 // Package executablecsrverifier defines the ExecutableCSRVerifier csrverifier.CSRVerifier.
-package executablecsrverifier
+package executablecertsuccesser
 
 import (
 	"bufio"
@@ -16,8 +16,8 @@ const (
 	otherExecute
 )
 
-// New creates a executablecsrverifier.ExecutableCSRVerifier.
-func New(path string, logger log.Logger) (*ExecutableCSRVerifier, error) {
+// New creates a executablecertsuccesser.ExecutableCertSuccesser.
+func New(path string, logger log.Logger) (*ExecutableCertSuccesser, error) {
 	fileInfo, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -25,28 +25,28 @@ func New(path string, logger log.Logger) (*ExecutableCSRVerifier, error) {
 
 	fileMode := fileInfo.Mode()
 	if fileMode.IsDir() {
-		return nil, errors.New("CSR Verifier executable is a directory")
+		return nil, errors.New("Cert Successer executable is a directory")
 	}
 
 	filePerm := fileMode.Perm()
 	if filePerm&(userExecute|groupExecute|otherExecute) == 0 {
-		return nil, errors.New("CSR Verifier executable is not executable")
+		return nil, errors.New("Cert Successer executable is not executable")
 	}
 
-	return &ExecutableCSRVerifier{executable: path, logger: logger}, nil
+	return &ExecutableCertSuccesser{executable: path, logger: logger}, nil
 }
 
-// ExecutableCSRVerifier implements a csrverifier.CSRVerifier.
-// It executes a command, and passes it the raw decrypted CSR.
-// If the command exit code is 0, the CSR is considered valid.
-// In any other cases, the CSR is considered invalid.
-type ExecutableCSRVerifier struct {
+// ExecutableCertSuccesser implements a certsuccesser.CertSuccesser.
+// It executes a command, and passes it the raw decrypted CSR and cert.
+// If the command exit code is 0, the cert can be returned to the client.
+// In any other cases, the cert is failed and the client gets an error.
+type ExecutableCertSuccesser struct {
 	executable string
 	logger     log.Logger
 }
 
-func (v *ExecutableCSRVerifier) Verify(transactionID string, data []byte) (bool, error) {
-	cmd := exec.Command(v.executable)
+func (v *ExecutableCertSuccesser) Success(transactionID string, data []byte, certFilename string) (bool, error) {
+	cmd := exec.Command(v.executable, certFilename)
 	cmd.Env = append(os.Environ(), "TRANSACTIONID="+transactionID)
 
 	stdin, err := cmd.StdinPipe()
@@ -65,7 +65,7 @@ func (v *ExecutableCSRVerifier) Verify(transactionID string, data []byte) (bool,
 	go func() {
 		scanner := bufio.NewScanner(stdout)
 		for scanner.Scan() {
-			v.logger.Log("info", "verifier stdout: "+scanner.Text())
+			v.logger.Log("info", "successer stdout: "+scanner.Text())
 		}
 	}()
 
@@ -76,7 +76,7 @@ func (v *ExecutableCSRVerifier) Verify(transactionID string, data []byte) (bool,
 	go func() {
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			v.logger.Log("info", "verifier stderr: "+scanner.Text())
+			v.logger.Log("info", "successer stderr: "+scanner.Text())
 		}
 	}()
 

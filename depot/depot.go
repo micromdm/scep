@@ -10,6 +10,7 @@ import (
 type Depot interface {
 	CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error)
 	Put(name string, crt *x509.Certificate) error
+	CertFilename(name string, crt *x509.Certificate) (string, error)
 	Serial() (*big.Int, error)
 	HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) (bool, error)
 }
