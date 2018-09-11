@@ -419,6 +419,31 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 
 }
 
+// golang's pkix.Name.ToRDNSequence() only looks for the following nine OIDs in Names,
+// everything else must be copied to ExtraNames first or it will not be in the created
+// certificate's subject:
+//
+//  "2.5.4.6": "C",    "2.5.4.10": "O",             "2.5.4.11": "OU",
+//  "2.5.4.3": "CN",   "2.5.4.5":  "SERIALNUMBER",  "2.5.4.7":  "L",
+//  "2.5.4.8": "ST",   "2.5.4.9":  "STREET",        "2.5.4.17": "POSTALCODE",
+//
+func workaroundCopyOids(template *x509.Certificate) {
+	for _, attribute := range template.Subject.Names {
+		if shouldCopyOid(attribute.Type) {
+			template.Subject.ExtraNames = append(template.Subject.ExtraNames, attribute)
+		}
+	}
+}
+func shouldCopyOid(oid asn1.ObjectIdentifier) bool {
+	if len(oid) != 4 || oid[0] != 2 || oid[1] != 5 || oid[2] != 4 {
+		return true
+	}
+	if oid[3] != 3 && oid[3] != 17 && !(oid[3] >= 5 && oid[3] <= 11) {
+		return true
+	}
+	return false
+}
+
 // SignCSR creates an x509.Certificate based on a template and Cert Authority credentials
 // returns a new PKIMessage with CertRep data
 func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
@@ -428,6 +453,8 @@ func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 			return nil, err
 		}
 	}
+	// ugly workaround to make non-standard attributes such as emailAddress visible to pkix.Name.ToRDNSequence()
+	workaroundCopyOids(template)
 	// sign the CSR creating a DER encoded cert
 	crtBytes, err := x509.CreateCertificate(rand.Reader, template, crtAuth, msg.CSRReqMessage.CSR.PublicKey, keyAuth)
 	if err != nil {
