@@ -137,7 +137,7 @@ func main() {
 		certSuccesser = executableCertSuccesser
 	}
 	var certFailer certfailer.CertFailer
-	if *flCertSuccesserExec > "" {
+	if *flCertFailerExec > "" {
 		executableCertFailer, err := executablecertfailer.New(*flCertFailerExec, lginfo)
 		if err != nil {
 			lginfo.Log("err", err, "msg", "Could not instantiate cert failer")
