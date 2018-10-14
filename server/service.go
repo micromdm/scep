@@ -66,7 +66,7 @@ func (svc *service) SCEPChallenge() (string, error) {
 }
 
 func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
-	defaultCaps := []byte("SHA-1\nSHA-256\nAES\nDES3\nSCEPStandard\nPOSTPKIOperation")
+	defaultCaps := []byte("Renewal\nSHA-1\nSHA-256\nAES\nDES3\nSCEPStandard\nPOSTPKIOperation")
 	return defaultCaps, nil
 }
 
