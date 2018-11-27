@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 VERSION="0.3.0.0"
 NAME=scepserver
@@ -16,3 +16,4 @@ build() {
 
 build "darwin" "amd64"
 build "linux" "amd64"
+build "freebsd" "amd64"
