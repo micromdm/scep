@@ -37,7 +37,10 @@ scepclient -private-key client.key -server-url=https://scep.example.com:4321/cer
 # Server Usage
 
 The default flags configure and run the scep server.  
-depot must be the path to a folder with `ca.pem` and `ca.key` files. 
+`depot` must be the path to a folder with `ca.pem` and `ca.key` files.
+
+Can optionally specify `casubdir` to store the `ca.pem` and `ca.key`
+files in a sub-directory of the depot.
 
 If you don't already have a CA to use, you can create one using the `scep ca` subcommand.
 
@@ -58,7 +61,9 @@ Usage of ./cmd/scepserver/scepserver:
   -debug
     	enable debug logging
   -depot string
-    	path to ca folder (default "depot")
+    	path to certificates folder (default "depot")
+  -casubdir string
+    	sub-path for the ca folder, under the depot
   -log-json
     	output JSON logs
   -port string
