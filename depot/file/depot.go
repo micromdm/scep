@@ -19,22 +19,23 @@ import (
 )
 
 // NewFileDepot returns a new cert depot.
-func NewFileDepot(path string) (*fileDepot, error) {
+func NewFileDepot(path string, caSubPath string) (*fileDepot, error) {
 	f, err := os.OpenFile(fmt.Sprintf("%s/index.txt", path),
 		os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return &fileDepot{dirPath: path}, nil
+	return &fileDepot{dirPath: path, caSubDirPath: caSubPath}, nil
 }
 
 type fileDepot struct {
 	dirPath string
+	caSubDirPath string
 }
 
 func (d *fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
-	caPEM, err := d.getFile("ca.pem")
+	caPEM, err := d.getFile(fmt.Sprintf("%s/ca.pem", d.caSubDirPath))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -42,7 +43,7 @@ func (d *fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error
 	if err != nil {
 		return nil, nil, err
 	}
-	keyPEM, err := d.getFile("ca.key")
+	keyPEM, err := d.getFile(fmt.Sprintf("%s/ca.key", d.caSubDirPath))
 	if err != nil {
 		return nil, nil, err
 	}

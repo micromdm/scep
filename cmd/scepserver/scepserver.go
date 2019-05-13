@@ -51,7 +51,8 @@ func main() {
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
-		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
+		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to certificates folder")
+		flDepotCaPath       = flag.String("casubdir", envString("SCEP_CA_SUBDIR", ""), "sub-path for the ca folder, under the depot")
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
 		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
@@ -96,7 +97,7 @@ func main() {
 	var err error
 	var depot depot.Depot // cert storage
 	{
-		depot, err = file.NewFileDepot(*flDepotPath)
+		depot, err = file.NewFileDepot(*flDepotPath, *flDepotCaPath)
 		if err != nil {
 			lginfo.Log("err", err)
 			os.Exit(1)

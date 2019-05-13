@@ -91,7 +91,7 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 	var err error
 	var depot depot.Depot // cert storage
 	{
-		depot, err = filedepot.NewFileDepot("../scep/testdata/testca")
+		depot, err = filedepot.NewFileDepot("../scep/testdata/testca", "")
 		if err != nil {
 			t.Fatal(err)
 		}
