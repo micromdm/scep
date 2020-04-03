@@ -380,6 +380,10 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 				Value: CertRep,
 			},
 			pkcs7.Attribute{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
+			},
+			pkcs7.Attribute{
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
@@ -465,6 +469,10 @@ func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 			pkcs7.Attribute{
 				Type:  oidSCEPmessageType,
 				Value: CertRep,
+			},
+			pkcs7.Attribute{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
 			},
 			pkcs7.Attribute{
 				Type:  oidSCEPrecipientNonce,
