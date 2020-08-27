@@ -339,7 +339,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	case PKCSReq, UpdateReq, RenewalReq:
 		csr, err := x509.ParseCertificateRequest(msg.pkiEnvelope)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "parse CSR from pkiEnvelope")
 		}
 		// check for challengePassword
 		cp, err := x509util.ParseChallengePassword(msg.pkiEnvelope)
