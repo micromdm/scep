@@ -15,7 +15,9 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/micromdm/scep/challenge"
 	challengestore "github.com/micromdm/scep/challenge/bolt"
+	scepdepot "github.com/micromdm/scep/depot"
 	boltdepot "github.com/micromdm/scep/depot/bolt"
 	"github.com/micromdm/scep/scep"
 )
@@ -27,37 +29,48 @@ func TestDynamicChallenge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = depot.CreateOrLoadCA(key, 5, "MicroMDM", "US")
+	crt, err = depot.CreateOrLoadCA(key, 5, "MicroMDM", "US")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	challengeDepot := createChallengeStore(0666, nil)
+
 	opts := []ServiceOption{
-		ClientValidity(365),
-		WithDynamicChallenges(challengeDepot),
+		WithCSRSignerMiddleware(challenge.NewCSRSignerMiddleware(challengeDepot))
 	}
-	svc, err := NewService(depot, opts...)
+
+	var nullSigner CSRSignerFunc = func(_ *scep.CSRReqMessage) (*x509.Certificate, error) {
+		return nil, nil
+	}
+
+	svc, err := NewService(crt, key, nullSigner, opts...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	challenger := svc.(interface {
-		SCEPChallenge() (string, error)
-	})
-	challenge, err := challenger.SCEPChallenge()
+	// challenger := svc.(interface {
+	// 	SCEPChallenge() (string, error)
+	// })
+	challenge, err := challengeDepot.SCEPChallenge()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+
+	m := &scep.CSRReqMessage{
+		ChallengePassword: challenge,
 	}
 
 	impl := svc.(*service)
-	if !impl.challengePasswordMatch(challenge) {
-		t.Errorf("challenge password does not match")
+	_, err = svc.signer.SignCSR(m)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if impl.challengePasswordMatch(challenge) {
-		t.Errorf("challenge password matched but should only be used once")
+	_, err = svc.signer.SignCSR(m)
+	if err == nil {
+		t.Errorf("challenge appeared to match but should only be used once")
 	}
-
 }
 
 func TestCaCert(t *testing.T) {

@@ -24,10 +24,10 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/micromdm/scep/csrverifier"
-	"github.com/micromdm/scep/csrverifier/executable"
-	"github.com/micromdm/scep/depot"
+	executablecsrverifier "github.com/micromdm/scep/csrverifier/executable"
+	scepdepot "github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/depot/file"
-	"github.com/micromdm/scep/server"
+	scepserver "github.com/micromdm/scep/server"
 )
 
 // version info
@@ -94,7 +94,7 @@ func main() {
 	lginfo := level.Info(logger)
 
 	var err error
-	var depot depot.Depot // cert storage
+	var depot scepdepot.Depot // cert storage
 	{
 		depot, err = file.NewFileDepot(*flDepotPath)
 		if err != nil {
@@ -125,14 +125,25 @@ func main() {
 	var svc scepserver.Service // scep service
 	{
 		svcOptions := []scepserver.ServiceOption{
-			scepserver.ChallengePassword(*flChallengePassword),
-			scepserver.WithCSRVerifier(csrVerifier),
-			scepserver.CAKeyPassword([]byte(*flCAPass)),
-			scepserver.ClientValidity(clientValidity),
-			scepserver.AllowRenewal(allowRenewal),
 			scepserver.WithLogger(logger),
 		}
-		svc, err = scepserver.NewService(depot, svcOptions...)
+		if *flChallengePassword != "" {
+			svcOptions = append(svcOptions, scepserver.WithStaticChallengePassword(*flChallengePassword))
+		}
+		if csrVerifier != nil {
+			svcOptions = append(svcOptions, scepserver.WithCSRSignerMiddleware(csrverifier.NewCSRSignerMiddleware(csrVerifier)))
+		}
+		crts, key, err := depot.CA([]byte(*flCAPass))
+		if err != nil {
+			lginfo.Log("err", err)
+			os.Exit(1)
+		}
+		if len(crts) < 1 {
+			lginfo.Log("err", "missing CA certificate")
+			os.Exit(1)
+		}
+		signer := scepdepot.CSRSigner(depot, allowRenewal, clientValidity, *flCAPass)
+		svc, err = scepserver.NewService(crts[0], key, signer, svcOptions...)
 		if err != nil {
 			lginfo.Log("err", err)
 			os.Exit(1)
@@ -255,7 +266,7 @@ func createCertificateAuthority(key *rsa.PrivateKey, years int, organization str
 
 			// activate CA
 			BasicConstraintsValid: true,
-			IsCA: true,
+			IsCA:                  true,
 			// Not allow any non-self-issued intermediate CA
 			MaxPathLen: 0,
 

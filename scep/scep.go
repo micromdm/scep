@@ -420,24 +420,13 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 
 }
 
-// SignCSR creates an x509.Certificate based on a template and Cert Authority credentials
-// returns a new PKIMessage with CertRep data
-func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, template *x509.Certificate) (*PKIMessage, error) {
+// Success returns a new PKIMessage with CertRep data using an already-issued certificate
+func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, crt *x509.Certificate) (*PKIMessage, error) {
 	// check if CSRReqMessage has already been decrypted
 	if msg.CSRReqMessage.CSR == nil {
 		if err := msg.DecryptPKIEnvelope(crtAuth, keyAuth); err != nil {
 			return nil, err
 		}
-	}
-	// sign the CSR creating a DER encoded cert
-	crtBytes, err := x509.CreateCertificate(rand.Reader, template, crtAuth, msg.CSRReqMessage.CSR.PublicKey, keyAuth)
-	if err != nil {
-		return nil, err
-	}
-	// parse the certificate
-	crt, err := x509.ParseCertificate(crtBytes)
-	if err != nil {
-		return nil, err
 	}
 
 	// create a degenerate cert structure
