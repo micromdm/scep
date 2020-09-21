@@ -87,6 +87,9 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	}
 
 	crt, err := svc.signer.SignCSR(msg.CSRReqMessage)
+	if err == nil && crt == nil {
+		err = errors.New("no signed certificate")
+	}
 	if err != nil {
 		svc.debugLogger.Log("msg", "failed to sign CSR", "err", err)
 		certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest)

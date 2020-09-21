@@ -14,6 +14,9 @@ deps: gomodcheck
 	@go mod download
 
 test:
+	go test -cover ./...
+
+testrace:
 	go test -cover -race ./...
 
 build: build-scepclient build-scepserver

@@ -16,6 +16,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/micromdm/scep/scep"
+
 	kitlog "github.com/go-kit/kit/log"
 
 	"github.com/micromdm/scep/depot"
@@ -120,9 +122,13 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 		}
 		depot = &noopDepot{depot}
 	}
+	crt, key, err := depot.CA([]byte{})
+	nullSigner := func(*scep.CSRReqMessage) (*x509.Certificate, error) {
+		return nil, nil
+	}
 	var svc scepserver.Service // scep service
 	{
-		svc, err = scepserver.NewService(depot, opts...)
+		svc, err = scepserver.NewService(crt[0], key, nullSigner)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -169,7 +175,7 @@ func newRSAKey(bits int) (*rsa.PrivateKey, error) {
 }
 
 // create a CSR using the same parameters as Keychain Access would produce
-func newCSR(priv *rsa.PrivateKey, email, country, cname string) ([]byte, error) {
+func newKeychainCSR(priv *rsa.PrivateKey, email, country, cname string) ([]byte, error) {
 	subj := pkix.Name{
 		Country:    []string{country},
 		CommonName: cname,
