@@ -31,6 +31,14 @@ type Service interface {
 	GetNextCACert(ctx context.Context) ([]byte, error)
 }
 
+// CSRSigner is a handler for CSR signing by the CA/RA
+//
+// SignCSR should take the CSR in the CSRReqMessage and return a
+// Certificate signed by the CA.
+type CSRSigner interface {
+	SignCSR(*scep.CSRReqMessage) (*x509.Certificate, error)
+}
+
 // CSRSignerFunc is an adapter for CSR signing by the CA/RA
 type CSRSignerFunc func(*scep.CSRReqMessage) (*x509.Certificate, error)
 
@@ -53,7 +61,7 @@ type service struct {
 	// The (chainable) CSR signing function. Intended to handle all
 	// SCEP request functionality such as CSR & challenge checking, CA
 	// issuance, RA proxying, etc.
-	signer CSRSignerFunc
+	signer CSRSigner
 
 	/// info logging is implemented in the service middleware layer.
 	debugLogger log.Logger
@@ -124,7 +132,7 @@ func WithAddlCA(ca *x509.Certificate) ServiceOption {
 	}
 }
 
-func staticChallengePasswordCSRSignerMiddleware(pw string, next CSRSignerFunc) CSRSignerFunc {
+func staticChallengePasswordCSRSignerMiddleware(pw string, next CSRSigner) CSRSignerFunc {
 	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		// TODO: this was only verified in the old version if our MessageType was PKCSReq
 		if pw != m.ChallengePassword {
@@ -144,7 +152,7 @@ func WithStaticChallengePassword(pw string) ServiceOption {
 }
 
 // WithCSRSignerMiddleware wraps the service
-func WithCSRSignerMiddleware(f func(CSRSignerFunc) CSRSignerFunc) ServiceOption {
+func WithCSRSignerMiddleware(f func(CSRSigner) CSRSigner) ServiceOption {
 	return func(s *service) error {
 		s.signer = f(s.signer)
 		return nil
@@ -152,7 +160,7 @@ func WithCSRSignerMiddleware(f func(CSRSignerFunc) CSRSignerFunc) ServiceOption 
 }
 
 // NewService creates a new scep service
-func NewService(crt *x509.Certificate, key *rsa.PrivateKey, signer CSRSignerFunc, opts ...ServiceOption) (Service, error) {
+func NewService(crt *x509.Certificate, key *rsa.PrivateKey, signer CSRSigner, opts ...ServiceOption) (Service, error) {
 	s := &service{
 		crt:         crt,
 		key:         key,

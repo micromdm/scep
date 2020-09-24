@@ -9,6 +9,7 @@ import (
 	"github.com/boltdb/bolt"
 	challengestore "github.com/micromdm/scep/challenge/bolt"
 	"github.com/micromdm/scep/scep"
+	scepserver "github.com/micromdm/scep/server"
 )
 
 func TestDynamicChallenge(t *testing.T) {
@@ -62,9 +63,9 @@ func TestDynamicChallenge(t *testing.T) {
 	}
 
 	// test CSRSigner middleware
-	nullSigner := func(*scep.CSRReqMessage) (*x509.Certificate, error) {
+	nullSigner := scepserver.CSRSignerFunc(func(*scep.CSRReqMessage) (*x509.Certificate, error) {
 		return nil, nil
-	}
+	})
 	mw := NewCSRSignerMiddleware(depot)
 	signer := mw(nullSigner)
 

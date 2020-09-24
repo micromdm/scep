@@ -123,9 +123,9 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 		depot = &noopDepot{depot}
 	}
 	crt, key, err := depot.CA([]byte{})
-	nullSigner := func(*scep.CSRReqMessage) (*x509.Certificate, error) {
+	nullSigner := scepserver.CSRSignerFunc(func(*scep.CSRReqMessage) (*x509.Certificate, error) {
 		return nil, nil
-	}
+	})
 	var svc scepserver.Service // scep service
 	{
 		svc, err = scepserver.NewService(crt[0], key, nullSigner)
