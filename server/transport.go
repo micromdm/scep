@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
@@ -94,6 +95,14 @@ func message(r *http.Request) ([]byte, error) {
 		q := r.URL.Query()
 		if _, ok := q["message"]; ok {
 			msg = q.Get("message")
+		}
+		op := q.Get("operation")
+		if op == "PKIOperation" {
+			msg2, err := url.PathUnescape(msg);
+			if err != nil {
+				return nil, err
+			}
+			return base64.StdEncoding.DecodeString(msg2)
 		}
 		return []byte(msg), nil
 	case "POST":

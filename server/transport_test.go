@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
@@ -79,6 +80,28 @@ func TestPKIOperation(t *testing.T) {
 	body := bytes.NewReader(pkcsreq)
 	url := server.URL + "/scep?operation=PKIOperation"
 	resp, err := http.Post(url, "", body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Error("expected", http.StatusOK, "got", resp.StatusCode)
+	}
+}
+
+func TestPKIOperationGET(t *testing.T) {
+	server, _, teardown := newServer(t)
+	defer teardown()
+	pkcsreq := loadTestFile(t, "../scep/testdata/PKCSReq.der")
+	message := base64.StdEncoding.EncodeToString(pkcsreq)
+	req, err := http.NewRequest("GET", server.URL + "/scep", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	params := req.URL.Query()
+	params.Set("operation", "PKIOperation")
+	params.Set("message", message)
+	req.URL.RawQuery = params.Encode()
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
