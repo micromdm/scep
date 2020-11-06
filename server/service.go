@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha1"
+	"crypto/subtle"
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
@@ -40,17 +41,17 @@ type Service interface {
 }
 
 type service struct {
-	depot                   depot.Depot
-	ca                      []*x509.Certificate // CA cert or chain
-	caKey                   *rsa.PrivateKey
-	caKeyPassword           []byte
-	csrTemplate             *x509.Certificate
-	challengePassword       string
-	supportDynamciChallenge bool
-	dynamicChallengeStore   challenge.Store
-	csrVerifier             csrverifier.CSRVerifier
-	allowRenewal            int // days before expiry, 0 to disable
-	clientValidity          int // client cert validity in days
+	depot                 depot.Depot
+	ca                    []*x509.Certificate // CA cert or chain
+	caKey                 *rsa.PrivateKey
+	caKeyPassword         []byte
+	csrTemplate           *x509.Certificate
+	challengePassword     string
+	dynamicChallengeStore challenge.Store
+	csrVerifier           csrverifier.CSRVerifier
+	combinedVerifier      csrverifier.CombinedVerifier
+	allowRenewal          int // days before expiry, 0 to disable
+	clientValidity        int // client cert validity in days
 
 	/// info logging is implemented in the service middleware layer.
 	debugLogger log.Logger
@@ -58,11 +59,10 @@ type service struct {
 
 // SCEPChallenge returns a brand new, random dynamic challenge.
 func (svc *service) SCEPChallenge() (string, error) {
-	if !svc.supportDynamciChallenge {
-		return svc.challengePassword, nil
+	if svc.dynamicChallengeStore != nil {
+		return svc.dynamicChallengeStore.SCEPChallenge()
 	}
-
-	return svc.dynamicChallengeStore.SCEPChallenge()
+	return svc.challengePassword, nil
 }
 
 func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -81,6 +81,30 @@ func (svc *service) GetCACert(ctx context.Context) ([]byte, int, error) {
 	return data, len(svc.ca), err
 }
 
+func (svc *service) verify(ctx context.Context, rawCSR []byte, challengePassword string) (bool, error) {
+	// Consider changing this so verifiers stack, instead of first one wins.
+
+	if svc.combinedVerifier != nil {
+		return svc.combinedVerifier.Verify(ctx, rawCSR, challengePassword)
+	}
+
+	if svc.csrVerifier != nil {
+		return svc.csrVerifier.Verify(rawCSR)
+	}
+
+	if svc.dynamicChallengeStore != nil {
+		return svc.dynamicChallengeStore.HasChallenge(challengePassword)
+	}
+
+	// No required password, don't validate
+	if svc.challengePassword == "" {
+		return true, nil
+	}
+
+	match := subtle.ConstantTimeCompare([]byte(svc.challengePassword), []byte(challengePassword)) == 1
+	return match, nil
+}
+
 func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
 	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(svc.debugLogger))
 	if err != nil {
@@ -91,27 +115,15 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 		return nil, err
 	}
 
-	// validate challenge passwords
+	// validate csr & challenge password
 	if msg.MessageType == scep.PKCSReq {
-		CSRIsValid := false
-
-		if svc.csrVerifier != nil {
-			result, err := svc.csrVerifier.Verify(msg.CSRReqMessage.RawDecrypted)
-			if err != nil {
-				return nil, err
-			}
-			CSRIsValid = result
-			if !CSRIsValid {
-				svc.debugLogger.Log("err", "CSR is not valid")
-			}
-		} else {
-			CSRIsValid = svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword)
-			if !CSRIsValid {
-				svc.debugLogger.Log("err", "scep challenge password does not match")
-			}
+		isValid, err := svc.verify(ctx, msg.CSRReqMessage.RawDecrypted, msg.CSRReqMessage.ChallengePassword)
+		if err != nil {
+			svc.debugLogger.Log(err)
+			return nil, err
 		}
 
-		if !CSRIsValid {
+		if !isValid {
 			certRep, err := msg.Fail(ca, svc.caKey, scep.BadRequest)
 			if err != nil {
 				return nil, err
@@ -182,27 +194,6 @@ func (svc *service) GetNextCACert(ctx context.Context) ([]byte, error) {
 	panic("not implemented")
 }
 
-func (svc *service) challengePasswordMatch(pw string) bool {
-	if svc.challengePassword == "" && !svc.supportDynamciChallenge {
-		// empty password, don't validate
-		return true
-	}
-	if !svc.supportDynamciChallenge && svc.challengePassword == pw {
-		return true
-	}
-
-	if svc.supportDynamciChallenge {
-		valid, err := svc.dynamicChallengeStore.HasChallenge(pw)
-		if err != nil {
-			svc.debugLogger.Log(err)
-			return false
-		}
-		return valid
-	}
-
-	return false
-}
-
 // ServiceOption is a server configuration option
 type ServiceOption func(*service) error
 
@@ -211,6 +202,13 @@ type ServiceOption func(*service) error
 func WithCSRVerifier(csrVerifier csrverifier.CSRVerifier) ServiceOption {
 	return func(s *service) error {
 		s.csrVerifier = csrVerifier
+		return nil
+	}
+}
+
+func WithCombinedVerifier(combinedVerifier csrverifier.CombinedVerifier) ServiceOption {
+	return func(s *service) error {
+		s.combinedVerifier = combinedVerifier
 		return nil
 	}
 }
@@ -260,7 +258,6 @@ func WithLogger(logger log.Logger) ServiceOption {
 
 func WithDynamicChallenges(cache challenge.Store) ServiceOption {
 	return func(s *service) error {
-		s.supportDynamciChallenge = true
 		s.dynamicChallengeStore = cache
 		return nil
 	}
