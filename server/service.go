@@ -85,7 +85,7 @@ func (svc *service) verify(ctx context.Context, rawCSR []byte, challengePassword
 	// Consider changing this so verifiers stack, instead of first one wins.
 
 	if svc.combinedVerifier != nil {
-		return svc.combinedVerifier.Verify(ctx, rawCSR, challengePassword)
+		return svc.combinedVerifier.Validate(ctx, rawCSR, challengePassword)
 	}
 
 	if svc.csrVerifier != nil {
@@ -119,7 +119,7 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	if msg.MessageType == scep.PKCSReq {
 		isValid, err := svc.verify(ctx, msg.CSRReqMessage.RawDecrypted, msg.CSRReqMessage.ChallengePassword)
 		if err != nil {
-			svc.debugLogger.Log(err)
+			svc.debugLogger.Log("err", err)
 			return nil, err
 		}
 

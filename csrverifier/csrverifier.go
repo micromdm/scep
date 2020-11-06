@@ -10,5 +10,5 @@ type CSRVerifier interface {
 
 // Verify the CSR and Challenge together
 type CombinedVerifier interface {
-	Verify(ctx context.Context, data []byte, challenge string) (bool, error)
+	Validate(ctx context.Context, data []byte, challenge string) (bool, error)
 }
