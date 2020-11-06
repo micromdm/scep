@@ -51,11 +51,23 @@ func TestDynamicChallenge(t *testing.T) {
 	}
 
 	impl := svc.(*service)
-	if !impl.challengePasswordMatch(challenge) {
-		t.Errorf("challenge password does not match")
+	{
+		result, err := impl.verify(context.TODO(), nil, challenge)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !result {
+			t.Errorf("challenge password does not match")
+		}
 	}
-	if impl.challengePasswordMatch(challenge) {
-		t.Errorf("challenge password matched but should only be used once")
+	{
+		result, err := impl.verify(context.TODO(), nil, challenge)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result {
+			t.Errorf("challenge password matched but should only be used once")
+		}
 	}
 
 }
