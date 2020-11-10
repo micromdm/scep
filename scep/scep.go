@@ -14,10 +14,10 @@ import (
 	"encoding/base64"
 	"math/big"
 
-	"github.com/fullsailor/pkcs7"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"go.mozilla.org/pkcs7"
 
 	"github.com/micromdm/scep/crypto/x509util"
 )
@@ -175,8 +175,6 @@ type PKIMessage struct {
 	SignerKey  *rsa.PrivateKey
 	SignerCert *x509.Certificate
 
-	SCEPEncryptionAlgorithm int
-
 	logger log.Logger
 }
 
@@ -214,6 +212,10 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	// parse PKCS#7 signed data
 	p7, err := pkcs7.Parse(data)
 	if err != nil {
+		return nil, err
+	}
+
+	if err := p7.Verify(); err != nil {
 		return nil, err
 	}
 
@@ -315,15 +317,8 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 		return err
 	}
 
-	algo, err := p7.EncryptionAlgorithm()
-	if err != nil {
-		return err
-	}
-	msg.SCEPEncryptionAlgorithm = algo
-
 	logKeyVals := []interface{}{
 		"msg", "decrypt pkiEnvelope",
-		"encryption_algorithm", algo,
 	}
 	defer func() { level.Debug(msg.logger).Log(logKeyVals...) }()
 
@@ -450,7 +445,7 @@ func (msg *PKIMessage) SignCSR(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 	}
 
 	// encrypt degenerate data using the original messages recipients
-	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates, pkcs7.WithEncryptionAlgorithm(msg.SCEPEncryptionAlgorithm))
+	e7, err := pkcs7.Encrypt(deg, msg.p7.Certificates)
 	if err != nil {
 		return nil, err
 	}
@@ -547,7 +542,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	}
 
 	derBytes := csr.Raw
-	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients, pkcs7.WithEncryptionAlgorithm(tmpl.SCEPEncryptionAlgorithm))
+	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients)
 	if err != nil {
 		return nil, err
 	}
@@ -571,7 +566,6 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	level.Debug(conf.logger).Log(
 		"msg", "creating SCEP CSR request",
 		"transaction_id", tID,
-		"encryption_algorithm", tmpl.SCEPEncryptionAlgorithm,
 		"signer_cn", tmpl.SignerCert.Subject.CommonName,
 	)
 
