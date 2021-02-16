@@ -195,18 +195,6 @@ func loadCACredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 	return cert, key
 }
 
-func loadClientCredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
-	cert, err := loadCertFromFile("../scep/testdata/testclient/client.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
-	key, err := loadKeyFromFile("../scep/testdata/testclient/client.key")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cert, key
-}
-
 func loadCertFromFile(path string) (*x509.Certificate, error) {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
