@@ -6,6 +6,8 @@ package scep
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -654,8 +656,10 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+	case *ecdsa.PublicKey:
+		pubBytes = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 	default:
-		return nil, errors.New("only RSA public key is supported")
+		return nil, errors.New("only ECDSA and RSA public keys are supported")
 	}
 
 	hash := sha1.Sum(pubBytes)
