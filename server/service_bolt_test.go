@@ -119,7 +119,7 @@ func TestCaCert(t *testing.T) {
 		tmpl := &scep.PKIMessage{
 			MessageType: scep.PKCSReq,
 			Recipients:  []*x509.Certificate{caCert},
-			SignerKey:   key,
+			SignerKey:   selfKey,
 			SignerCert:  signerCert,
 		}
 
