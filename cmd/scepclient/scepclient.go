@@ -69,11 +69,6 @@ func run(cfg runCfg) error {
 		return err
 	}
 
-	sigAlgo := x509.SHA1WithRSA
-	if client.Supports("SHA-256") || client.Supports("SCEPStandard") {
-		sigAlgo = x509.SHA256WithRSA
-	}
-
 	key, err := loadOrMakeKey(cfg.keyPath, cfg.keyBits)
 	if err != nil {
 		return err
@@ -88,7 +83,6 @@ func run(cfg runCfg) error {
 		province:  cfg.province,
 		challenge: cfg.challenge,
 		key:       key,
-		sigAlgo:   sigAlgo,
 	}
 
 	csr, err := loadOrMakeCSR(cfg.csrPath, opts)
