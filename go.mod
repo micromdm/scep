@@ -1,5 +1,7 @@
 module github.com/micromdm/scep
 
+go 1.16
+
 require (
 	github.com/boltdb/bolt v1.3.1
 	github.com/go-kit/kit v0.4.0
@@ -14,3 +16,5 @@ require (
 	golang.org/x/net v0.0.0-20170726083632-f5079bd7f6f7 // indirect
 	golang.org/x/sys v0.0.0-20170728174421-0f826bdd13b5 // indirect
 )
+
+replace go.mozilla.org/pkcs7 v0.0.0-20200128120323-432b2356ecb1 => github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568
