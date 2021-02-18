@@ -146,11 +146,18 @@ func WithLogger(logger log.Logger) Option {
 	}
 }
 
+func WithCaCerts(caCerts []*x509.Certificate) Option {
+	return func(c *config) {
+		c.caCerts = caCerts
+	}
+}
+
 // Option specifies custom configuration for SCEP.
 type Option func(*config)
 
 type config struct {
-	logger log.Logger
+	logger  log.Logger
+	caCerts []*x509.Certificate // specified if CA certificates have already been retrieved
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -217,6 +224,11 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		return nil, err
 	}
 
+	// According to RFC #2315 Section 9.1, it is valid that the server sends fewer
+	// certificates than necessary, if it is expected that those verifying the
+	// signatures have an alternate means of obtaining necessary certificates.
+	// In SCEP case, an alternate means is to use GetCaCert request.
+	p7.Certificates = append(p7.Certificates, conf.caCerts...)
 	if err := p7.Verify(); err != nil {
 		return nil, err
 	}
