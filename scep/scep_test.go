@@ -56,11 +56,11 @@ func TestParsePKIEnvelopeCert_MissingCertificatesForSigners(t *testing.T) {
 	// Try to parse the PKIMessage without providing certificates for signers.
 	_, err := scep.ParsePKIMessage(certRepMissingCertificates)
 	if err == nil {
-		t.Fatalf("parsed PKIMessage without providing signer certificates")
+		t.Fatal("parsed PKIMessage without providing signer certificates")
 	}
 
-	signerCert := DecodePEMCert(t, caPEM)
-	msg, err := scep.ParsePKIMessage(certRepMissingCertificates, scep.WithCaCerts([]*x509.Certificate{signerCert}))
+	signerCert := decodePEMCert(t, caPEM)
+	msg, err := scep.ParsePKIMessage(certRepMissingCertificates, scep.WithCACerts([]*x509.Certificate{signerCert}))
 	if err != nil {
 		t.Fatalf("failed to parse PKIMessage: %v", err)
 	}
@@ -270,7 +270,7 @@ func loadKeyFromFile(path string) (*rsa.PrivateKey, error) {
 
 }
 
-func DecodePEMCert(t *testing.T, data []byte) *x509.Certificate {
+func decodePEMCert(t *testing.T, data []byte) *x509.Certificate {
 	pemBlock, _ := pem.Decode(data)
 	if pemBlock == nil {
 		t.Fatal("PEM decode failed")
