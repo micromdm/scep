@@ -1,3 +1,5 @@
+![CI](https://github.com/micromdm/scep/workflows/CI/badge.svg)
+
 `scep` is a Simple Certificate Enrollment Protocol server and client
 
 # Installation
