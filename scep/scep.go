@@ -146,11 +146,18 @@ func WithLogger(logger log.Logger) Option {
 	}
 }
 
+func WithCaCerts(caCerts []*x509.Certificate) Option {
+	return func(c *config) {
+		c.caCerts = caCerts
+	}
+}
+
 // Option specifies custom configuration for SCEP.
 type Option func(*config)
 
 type config struct {
-	logger log.Logger
+	logger  log.Logger
+	caCerts []*x509.Certificate // specified if CA certificates have already been retrieved
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -217,6 +224,11 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		return nil, err
 	}
 
+	// According to RFC #2315 Section 9.1, it is valid that the server sends fewer
+	// certificates than necessary, if it is expected that those verifying the
+	// signatures have an alternate means of obtaining necessary certificates.
+	// In SCEP case, an alternate means is to use GetCaCert request.
+	p7.Certificates = append(p7.Certificates, conf.caCerts...)
 	if err := p7.Verify(); err != nil {
 		return nil, err
 	}
@@ -360,27 +372,27 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, info FailInfo) (*PKIMessage, error) {
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: msg.TransactionID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPpkiStatus,
 				Value: FAILURE,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPfailInfo,
 				Value: info,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: CertRep,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: msg.SenderNonce,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
@@ -444,23 +456,23 @@ func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 	// PKIMessageAttributes to be signed
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: msg.TransactionID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPpkiStatus,
 				Value: SUCCESS,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: CertRep,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: msg.SenderNonce,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
@@ -563,15 +575,15 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	// PKIMessageAttributes to be signed
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: tID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: tmpl.MessageType,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: sn,
 			},
