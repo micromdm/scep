@@ -89,7 +89,16 @@ func TestSignCSR(t *testing.T) {
 			x509.ExtKeyUsageClientAuth,
 		},
 	}
-	certRep, err := msg.SignCSR(cacert, cakey, tmpl)
+	// sign the CSR creating a DER encoded cert
+	crtBytes, err := x509.CreateCertificate(rand.Reader, tmpl, cacert, csr.PublicKey, cakey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crt, err := x509.ParseCertificate(crtBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certRep, err := msg.Success(cacert, cakey, crt)
 	if err != nil {
 		t.Fatal(err)
 	}

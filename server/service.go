@@ -2,19 +2,11 @@ package scepserver
 
 import (
 	"context"
-	"crypto"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
-	"encoding/asn1"
 	"errors"
-	"math/big"
-	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/micromdm/scep/challenge"
-	"github.com/micromdm/scep/csrverifier"
-	"github.com/micromdm/scep/depot"
 	"github.com/micromdm/scep/scep"
 )
 
@@ -39,30 +31,40 @@ type Service interface {
 	GetNextCACert(ctx context.Context) ([]byte, error)
 }
 
+// CSRSigner is a handler for CSR signing by the CA/RA
+//
+// SignCSR should take the CSR in the CSRReqMessage and return a
+// Certificate signed by the CA.
+type CSRSigner interface {
+	SignCSR(*scep.CSRReqMessage) (*x509.Certificate, error)
+}
+
+// CSRSignerFunc is an adapter for CSR signing by the CA/RA
+type CSRSignerFunc func(*scep.CSRReqMessage) (*x509.Certificate, error)
+
+// SignCSR calls f(m)
+func (f CSRSignerFunc) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
+	return f(m)
+}
+
 type service struct {
-	depot                   depot.Depot
-	ca                      []*x509.Certificate // CA cert or chain
-	caKey                   *rsa.PrivateKey
-	caKeyPassword           []byte
-	csrTemplate             *x509.Certificate
-	challengePassword       string
-	supportDynamciChallenge bool
-	dynamicChallengeStore   challenge.Store
-	csrVerifier             csrverifier.CSRVerifier
-	allowRenewal            int // days before expiry, 0 to disable
-	clientValidity          int // client cert validity in days
+	// The service certificate and key for SCEP exchanges. These are
+	// quite likely the same as the CA keypair but may be its own SCEP
+	// specific keypair in the case of e.g. RA (proxy) operation.
+	crt *x509.Certificate
+	key *rsa.PrivateKey
+
+	// Optional additional CA certificates for e.g. RA (proxy) use.
+	// Only used in this service when responding to GetCACert.
+	addlCa []*x509.Certificate
+
+	// The (chainable) CSR signing function. Intended to handle all
+	// SCEP request functionality such as CSR & challenge checking, CA
+	// issuance, RA proxying, etc.
+	signer CSRSigner
 
 	/// info logging is implemented in the service middleware layer.
 	debugLogger log.Logger
-}
-
-// SCEPChallenge returns a brand new, random dynamic challenge.
-func (svc *service) SCEPChallenge() (string, error) {
-	if !svc.supportDynamciChallenge {
-		return svc.challengePassword, nil
-	}
-
-	return svc.dynamicChallengeStore.SCEPChallenge()
 }
 
 func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -71,14 +73,16 @@ func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
 }
 
 func (svc *service) GetCACert(ctx context.Context) ([]byte, int, error) {
-	if len(svc.ca) == 0 {
-		return nil, 0, errors.New("missing CA Cert")
+	if svc.crt == nil {
+		return nil, 0, errors.New("missing CA certificate")
 	}
-	if len(svc.ca) == 1 {
-		return svc.ca[0].Raw, 1, nil
+	if len(svc.addlCa) < 1 {
+		return svc.crt.Raw, 1, nil
 	}
-	data, err := scep.DegenerateCertificates(svc.ca)
-	return data, len(svc.ca), err
+	certs := []*x509.Certificate{svc.crt}
+	certs = append(certs, svc.addlCa...)
+	data, err := scep.DegenerateCertificates(certs)
+	return data, len(svc.addlCa) + 1, err
 }
 
 func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
@@ -86,171 +90,30 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	if err != nil {
 		return nil, err
 	}
-	ca := svc.ca[0]
-	if err := msg.DecryptPKIEnvelope(svc.ca[0], svc.caKey); err != nil {
+	if err := msg.DecryptPKIEnvelope(svc.crt, svc.key); err != nil {
 		return nil, err
 	}
 
-	// validate challenge passwords
-	if msg.MessageType == scep.PKCSReq {
-		CSRIsValid := false
-
-		if svc.csrVerifier != nil {
-			result, err := svc.csrVerifier.Verify(msg.CSRReqMessage.RawDecrypted)
-			if err != nil {
-				return nil, err
-			}
-			CSRIsValid = result
-			if !CSRIsValid {
-				svc.debugLogger.Log("err", "CSR is not valid")
-			}
-		} else {
-			CSRIsValid = svc.challengePasswordMatch(msg.CSRReqMessage.ChallengePassword)
-			if !CSRIsValid {
-				svc.debugLogger.Log("err", "scep challenge password does not match")
-			}
-		}
-
-		if !CSRIsValid {
-			certRep, err := msg.Fail(ca, svc.caKey, scep.BadRequest)
-			if err != nil {
-				return nil, err
-			}
-			return certRep.Raw, nil
-		}
+	crt, err := svc.signer.SignCSR(msg.CSRReqMessage)
+	if err == nil && crt == nil {
+		err = errors.New("no signed certificate")
 	}
-
-	csr := msg.CSRReqMessage.CSR
-	id, err := generateSubjectKeyID(csr.PublicKey)
 	if err != nil {
-		return nil, err
+		svc.debugLogger.Log("msg", "failed to sign CSR", "err", err)
+		certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest)
+		return certRep.Raw, err
 	}
 
-	serial, err := svc.depot.Serial()
-	if err != nil {
-		return nil, err
-	}
-
-	duration := svc.clientValidity
-
-	// create cert template
-	tmpl := &x509.Certificate{
-		SerialNumber: serial,
-		Subject:      csr.Subject,
-		NotBefore:    time.Now().Add(-600).UTC(),
-		NotAfter:     time.Now().AddDate(0, 0, duration).UTC(),
-		SubjectKeyId: id,
-		KeyUsage:     x509.KeyUsageDigitalSignature,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageClientAuth,
-		},
-		SignatureAlgorithm: csr.SignatureAlgorithm,
-		DNSNames:           csr.DNSNames,
-		EmailAddresses:     csr.EmailAddresses,
-		IPAddresses:        csr.IPAddresses,
-		URIs:               csr.URIs,
-	}
-
-	certRep, err := msg.SignCSR(ca, svc.caKey, tmpl)
-	if err != nil {
-		return nil, err
-	}
-
-	crt := certRep.CertRepMessage.Certificate
-	name := certName(crt)
-
-	// Test if this certificate is already in the CADB, revoke if needed
-	// revocation is done if the validity of the existing certificate is
-	// less than allowRenewal (14 days by default)
-	_, err = svc.depot.HasCN(name, svc.allowRenewal, crt, false)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := svc.depot.Put(name, crt); err != nil {
-		return nil, err
-	}
-
-	return certRep.Raw, nil
-}
-
-func certName(crt *x509.Certificate) string {
-	if crt.Subject.CommonName != "" {
-		return crt.Subject.CommonName
-	}
-	return string(crt.Signature)
+	certRep, err := msg.Success(svc.crt, svc.key, crt)
+	return certRep.Raw, err
 }
 
 func (svc *service) GetNextCACert(ctx context.Context) ([]byte, error) {
 	panic("not implemented")
 }
 
-func (svc *service) challengePasswordMatch(pw string) bool {
-	if svc.challengePassword == "" && !svc.supportDynamciChallenge {
-		// empty password, don't validate
-		return true
-	}
-	if !svc.supportDynamciChallenge && svc.challengePassword == pw {
-		return true
-	}
-
-	if svc.supportDynamciChallenge {
-		valid, err := svc.dynamicChallengeStore.HasChallenge(pw)
-		if err != nil {
-			svc.debugLogger.Log(err)
-			return false
-		}
-		return valid
-	}
-
-	return false
-}
-
 // ServiceOption is a server configuration option
 type ServiceOption func(*service) error
-
-// WithCSRVerifier is an option argument to NewService
-// which allows setting a CSR verifier.
-func WithCSRVerifier(csrVerifier csrverifier.CSRVerifier) ServiceOption {
-	return func(s *service) error {
-		s.csrVerifier = csrVerifier
-		return nil
-	}
-}
-
-// ChallengePassword is an optional argument to NewService
-// which allows setting a preshared key for SCEP.
-func ChallengePassword(pw string) ServiceOption {
-	return func(s *service) error {
-		s.challengePassword = pw
-		return nil
-	}
-}
-
-// CAKeyPassword is an optional argument to NewService for
-// specifying the CA private key password.
-func CAKeyPassword(pw []byte) ServiceOption {
-	return func(s *service) error {
-		s.caKeyPassword = pw
-		return nil
-	}
-}
-
-// allowRenewal sets the days before expiry which we are allowed to renew (optional)
-func AllowRenewal(duration int) ServiceOption {
-	return func(s *service) error {
-		s.allowRenewal = duration
-		return nil
-	}
-}
-
-// ClientValidity sets the validity of signed client certs in days (optional parameter)
-func ClientValidity(duration int) ServiceOption {
-	return func(s *service) error {
-		s.clientValidity = duration
-		return nil
-	}
-}
 
 // WithLogger configures a logger for the SCEP Service.
 // By default, a no-op logger is used.
@@ -261,18 +124,47 @@ func WithLogger(logger log.Logger) ServiceOption {
 	}
 }
 
-func WithDynamicChallenges(cache challenge.Store) ServiceOption {
+// WithAddlCA appends an additional certificate to the slice of CA certs
+func WithAddlCA(ca *x509.Certificate) ServiceOption {
 	return func(s *service) error {
-		s.supportDynamciChallenge = true
-		s.dynamicChallengeStore = cache
+		s.addlCa = append(s.addlCa, ca)
+		return nil
+	}
+}
+
+func staticChallengePasswordCSRSignerMiddleware(pw string, next CSRSigner) CSRSignerFunc {
+	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
+		// TODO: this was only verified in the old version if our MessageType was PKCSReq
+		if pw != m.ChallengePassword {
+			return nil, errors.New("challenge password mismatch")
+		}
+		return next.SignCSR(m)
+	}
+}
+
+// WithStaticChallengePassword wraps the service signer function in
+// a middleware that checks for matching challenge passwords
+func WithStaticChallengePassword(pw string) ServiceOption {
+	return func(s *service) error {
+		s.signer = staticChallengePasswordCSRSignerMiddleware(pw, s.signer)
+		return nil
+	}
+}
+
+// WithCSRSignerMiddleware wraps the service
+func WithCSRSignerMiddleware(f func(CSRSigner) CSRSigner) ServiceOption {
+	return func(s *service) error {
+		s.signer = f(s.signer)
 		return nil
 	}
 }
 
 // NewService creates a new scep service
-func NewService(depot depot.Depot, opts ...ServiceOption) (Service, error) {
+func NewService(crt *x509.Certificate, key *rsa.PrivateKey, signer CSRSigner, opts ...ServiceOption) (Service, error) {
 	s := &service{
-		depot:       depot,
+		crt:         crt,
+		key:         key,
+		signer:      signer,
 		debugLogger: log.NewNopLogger(),
 	}
 	for _, opt := range opts {
@@ -280,40 +172,5 @@ func NewService(depot depot.Depot, opts ...ServiceOption) (Service, error) {
 			return nil, err
 		}
 	}
-
-	var err error
-	s.ca, s.caKey, err = depot.CA(s.caKeyPassword)
-	if err != nil {
-		return nil, err
-	}
 	return s, nil
-}
-
-// rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.
-type rsaPublicKey struct {
-	N *big.Int
-	E int
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("only RSA public key is supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
 }
