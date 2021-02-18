@@ -146,11 +146,21 @@ func WithLogger(logger log.Logger) Option {
 	}
 }
 
+// WithCACerts adds option CA certificates to the SCEP operations.
+// Note: This changes the verification behavior of PKCS #7 messages. If this
+// option is specified, only caCerts will be used as expected signers.
+func WithCACerts(caCerts []*x509.Certificate) Option {
+	return func(c *config) {
+		c.caCerts = caCerts
+	}
+}
+
 // Option specifies custom configuration for SCEP.
 type Option func(*config)
 
 type config struct {
-	logger log.Logger
+	logger  log.Logger
+	caCerts []*x509.Certificate // specified if CA certificates have already been retrieved
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -215,6 +225,18 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	p7, err := pkcs7.Parse(data)
 	if err != nil {
 		return nil, err
+	}
+
+	if len(conf.caCerts) > 0 {
+		// According to RFC #2315 Section 9.1, it is valid that the server sends fewer
+		// certificates than necessary, if it is expected that those verifying the
+		// signatures have an alternate means of obtaining necessary certificates.
+		// In SCEP case, an alternate means is to use GetCaCert request.
+		// Note: The https://github.com/jscep/jscep implementation logs a warning if
+		// no certificates were found for signers in the PKCS #7 received from the
+		// server, but the certificates obtained from GetCaCert request are still
+		// used for decoding the message.
+		p7.Certificates = conf.caCerts
 	}
 
 	if err := p7.Verify(); err != nil {

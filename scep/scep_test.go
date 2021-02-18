@@ -23,6 +23,11 @@ func testParsePKIMessage(t *testing.T, data []byte) *scep.PKIMessage {
 	if err != nil {
 		t.Fatal(err)
 	}
+	validateParsedPKIMessage(t, msg)
+	return msg
+}
+
+func validateParsedPKIMessage(t *testing.T, msg *scep.PKIMessage) {
 	if msg.TransactionID == "" {
 		t.Errorf("expected TransactionID attribute")
 	}
@@ -39,7 +44,27 @@ func testParsePKIMessage(t *testing.T, data []byte) *scep.PKIMessage {
 			t.Errorf("expected SenderNonce attribute")
 		}
 	}
-	return msg
+}
+
+// Tests the case when servers reply with PKCS #7 signed-data that contains no
+// certificates assuming that the client can request CA certificates using
+// GetCaCert request.
+func TestParsePKIEnvelopeCert_MissingCertificatesForSigners(t *testing.T) {
+	certRepMissingCertificates := loadTestFile(t, "testdata/testca2/CertRep_NoCertificatesForSigners.der")
+	caPEM := loadTestFile(t, "testdata/testca2/ca2.pem")
+
+	// Try to parse the PKIMessage without providing certificates for signers.
+	_, err := scep.ParsePKIMessage(certRepMissingCertificates)
+	if err == nil {
+		t.Fatal("parsed PKIMessage without providing signer certificates")
+	}
+
+	signerCert := decodePEMCert(t, caPEM)
+	msg, err := scep.ParsePKIMessage(certRepMissingCertificates, scep.WithCACerts([]*x509.Certificate{signerCert}))
+	if err != nil {
+		t.Fatalf("failed to parse PKIMessage: %v", err)
+	}
+	validateParsedPKIMessage(t, msg)
 }
 
 func TestDecryptPKIEnvelopeCSR(t *testing.T) {
@@ -243,6 +268,22 @@ func loadKeyFromFile(path string) (*rsa.PrivateKey, error) {
 
 	return x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
 
+}
+
+func decodePEMCert(t *testing.T, data []byte) *x509.Certificate {
+	pemBlock, _ := pem.Decode(data)
+	if pemBlock == nil {
+		t.Fatal("PEM decode failed")
+	}
+	if pemBlock.Type != certificatePEMBlockType {
+		t.Fatal("unmatched type or headers")
+	}
+
+	cert, err := x509.ParseCertificate(pemBlock.Bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cert
 }
 
 // rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.

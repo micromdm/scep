@@ -185,7 +185,7 @@ func run(cfg runCfg) error {
 			return errors.Wrapf(err, "PKIOperation for %s", msgType)
 		}
 
-		respMsg, err = scep.ParsePKIMessage(respBytes, scep.WithLogger(logger))
+		respMsg, err = scep.ParsePKIMessage(respBytes, scep.WithLogger(logger), scep.WithCACerts(recipients))
 		if err != nil {
 			return errors.Wrapf(err, "parsing pkiMessage response %s", msgType)
 		}
