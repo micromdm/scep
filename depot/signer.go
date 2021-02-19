@@ -42,7 +42,10 @@ func CSRSigner(depot Depot, allowRenewal, clientValidity int, caPass string) sce
 				x509.ExtKeyUsageClientAuth,
 			},
 			SignatureAlgorithm: csr.SignatureAlgorithm,
+			DNSNames:           csr.DNSNames,
 			EmailAddresses:     csr.EmailAddresses,
+			IPAddresses:        csr.IPAddresses,
+			URIs:               csr.URIs,
 		}
 
 		crts, key, err := depot.CA([]byte(caPass))
