@@ -35,7 +35,6 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rsa"
-	_ "crypto/sha1"
 	_ "crypto/sha256"
 	_ "crypto/sha512"
 	"crypto/x509"

@@ -4,7 +4,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/asn1"
 	"errors"
@@ -110,7 +110,7 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 		return nil, errors.New("only RSA public key is supported")
 	}
 
-	hash := sha1.Sum(pubBytes)
+	hash := sha256.Sum256(pubBytes)
 
 	return hash[:], nil
 }

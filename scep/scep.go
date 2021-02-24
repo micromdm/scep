@@ -10,7 +10,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
@@ -673,7 +673,7 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 		return nil, errors.New("only ECDSA and RSA public keys are supported")
 	}
 
-	hash := sha1.Sum(pubBytes)
+	hash := sha256.Sum256(pubBytes)
 
 	return hash[:], nil
 }
