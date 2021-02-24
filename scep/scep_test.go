@@ -130,6 +130,16 @@ func TestSignCSR(t *testing.T) {
 	testParsePKIMessage(t, certRep.Raw)
 }
 
+type testNewCSRRequestStruct struct {
+	keyUsage        x509.KeyUsage
+	shouldCreateCSR bool
+}
+
+var testNewCSRRequestData = []testNewCSRRequestStruct{
+	{x509.KeyUsageDigitalSignature, false},
+	{x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature, true},
+}
+
 func TestNewCSRRequest(t *testing.T) {
 	key, err := newRSAKey(2048)
 	if err != nil {
@@ -144,22 +154,30 @@ func TestNewCSRRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 	clientcert, clientkey := loadClientCredentials(t)
-	cacert, cakey := loadCACredentials(t)
-	tmpl := &scep.PKIMessage{
-		MessageType: scep.PKCSReq,
-		Recipients:  []*x509.Certificate{cacert},
-		SignerCert:  clientcert,
-		SignerKey:   clientkey,
-	}
+	for i, test := range testNewCSRRequestData {
+		cacert, cakey := createCaCertWithKeyUsage(t, test.keyUsage)
+		tmpl := &scep.PKIMessage{
+			MessageType: scep.PKCSReq,
+			Recipients:  []*x509.Certificate{cacert},
+			SignerCert:  clientcert,
+			SignerKey:   clientkey,
+		}
 
-	pkcsreq, err := scep.NewCSRRequest(csr, tmpl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg := testParsePKIMessage(t, pkcsreq.Raw)
-	err = msg.DecryptPKIEnvelope(cacert, cakey)
-	if err != nil {
-		t.Fatal(err)
+		pkcsreq, err := scep.NewCSRRequest(csr, tmpl)
+		if test.shouldCreateCSR && err != nil {
+			t.Fatalf("%d keyUsage: %d, failed creating a CSR request: %v", i, test.keyUsage, err)
+		}
+		if !test.shouldCreateCSR && err == nil {
+			t.Fatalf("%d keyUsage: %d, shouldn't have created a CSR: %v", i, test.keyUsage, err)
+		}
+		if !test.shouldCreateCSR {
+			return
+		}
+		msg := testParsePKIMessage(t, pkcsreq.Raw)
+		err = msg.DecryptPKIEnvelope(cacert, cakey)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -177,7 +195,7 @@ func newCSR(priv *rsa.PrivateKey, email, country, cname string) ([]byte, error) 
 	subj := pkix.Name{
 		Country:    []string{country},
 		CommonName: cname,
-		ExtraNames: []pkix.AttributeTypeAndValue{pkix.AttributeTypeAndValue{
+		ExtraNames: []pkix.AttributeTypeAndValue{{
 			Type:  []int{1, 2, 840, 113549, 1, 9, 1},
 			Value: email,
 		}},
@@ -194,6 +212,64 @@ func loadTestFile(t *testing.T, path string) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// createCaCertWithKeyUsage generates a CA key and certificate with keyUsage.
+func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certificate, *rsa.PrivateKey) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := pkix.Name{
+		Country:            []string{"US"},
+		Organization:       []string{"MICROMDM"},
+		CommonName:         "MICROMDM SCEP CA",
+	}
+	subjectKeyID, err := generateSubjectKeyID(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authTemplate := x509.Certificate{
+		SerialNumber:       big.NewInt(1),
+		Subject:            subject,
+		NotBefore:          time.Now().Add(-600).UTC(),
+		NotAfter:           time.Now().AddDate(1, 0, 0).UTC(),
+		KeyUsage:           keyUsage,
+		IsCA:                        true,
+		SubjectKeyId:                subjectKeyID,
+	}
+	crtBytes, err := x509.CreateCertificate(rand.Reader, &authTemplate, &authTemplate, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(crtBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cert, key
+}
+
+// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
+// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
+func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
+	var pubBytes []byte
+	var err error
+	switch pub := pub.(type) {
+	case *rsa.PublicKey:
+		pubBytes, err = asn1.Marshal(rsaPublicKey{
+			N: pub.N,
+			E: pub.E,
+		})
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("only RSA public key is supported")
+	}
+
+	hash := sha1.Sum(pubBytes)
+
+	return hash[:], nil
 }
 
 func loadCACredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {

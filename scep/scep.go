@@ -382,27 +382,27 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, info FailInfo) (*PKIMessage, error) {
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: msg.TransactionID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPpkiStatus,
 				Value: FAILURE,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPfailInfo,
 				Value: info,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: CertRep,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: msg.SenderNonce,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
@@ -466,23 +466,23 @@ func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 	// PKIMessageAttributes to be signed
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: msg.TransactionID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPpkiStatus,
 				Value: SUCCESS,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: CertRep,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: msg.SenderNonce,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPrecipientNonce,
 				Value: msg.SenderNonce,
 			},
@@ -555,7 +555,11 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	}
 
 	derBytes := csr.Raw
-	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients)
+	recipients := filterCertificatesByKeyUsage(tmpl.Recipients, x509.KeyUsageKeyEncipherment)
+	if len(recipients) == 0 {
+		return nil, errors.New("no recipients that can be used for KeyEncipherment.")
+	}
+	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
 		return nil, err
 	}
@@ -585,15 +589,15 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	// PKIMessageAttributes to be signed
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPtransactionID,
 				Value: tID,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPmessageType,
 				Value: tmpl.MessageType,
 			},
-			pkcs7.Attribute{
+			{
 				Type:  oidSCEPsenderNonce,
 				Value: sn,
 			},
@@ -676,4 +680,13 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	hash := sha1.Sum(pubBytes)
 
 	return hash[:], nil
+}
+
+func filterCertificatesByKeyUsage(recipients []*x509.Certificate, keyUsage x509.KeyUsage) (filtered []*x509.Certificate) {
+	for _, cert := range recipients {
+		if cert.KeyUsage&keyUsage == keyUsage {
+			filtered = append(filtered, cert)
+		}
+	}
+	return filtered
 }
