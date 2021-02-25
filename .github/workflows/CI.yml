@@ -7,8 +7,8 @@ on:
     types: [opened, reopened, synchronize]
 
 jobs:
-  test-build:
-    name: Test & Build
+  build-test:
+    name: Build, test & format
     strategy:
       matrix:
         go-version: [1.15.x, 1.16.x]
@@ -27,3 +27,7 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+
+    - name: Format
+      if: matrix.platform == 'ubuntu-latest'
+      run: if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then exit 1; fi
