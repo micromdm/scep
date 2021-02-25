@@ -131,35 +131,54 @@ func TestSignCSR(t *testing.T) {
 }
 
 func TestNewCSRRequest(t *testing.T) {
-	key, err := newRSAKey(2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	derBytes, err := newCSR(key, "john.doe@example.com", "US", "com.apple.scep.2379B935-294B-4AF1-A213-9BD44A2C6688")
-	if err != nil {
-		t.Fatal(err)
-	}
-	csr, err := x509.ParseCertificateRequest(derBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	clientcert, clientkey := loadClientCredentials(t)
-	cacert, cakey := loadCACredentials(t)
-	tmpl := &scep.PKIMessage{
-		MessageType: scep.PKCSReq,
-		Recipients:  []*x509.Certificate{cacert},
-		SignerCert:  clientcert,
-		SignerKey:   clientkey,
-	}
+	for _, test := range []struct {
+		testName        string
+		keyUsage        x509.KeyUsage
+		shouldCreateCSR bool
+	}{
+		{"KeyEncipherment not set", x509.KeyUsageDigitalSignature, false},
+		{"KeyEncipherment is set", x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature, true},
+	} {
+		test := test
+		t.Run(test.testName, func(t *testing.T) {
+			t.Parallel()
+			key, err := newRSAKey(2048)
+			if err != nil {
+				t.Fatal(err)
+			}
+			derBytes, err := newCSR(key, "john.doe@example.com", "US", "com.apple.scep.2379B935-294B-4AF1-A213-9BD44A2C6688")
+			if err != nil {
+				t.Fatal(err)
+			}
+			csr, err := x509.ParseCertificateRequest(derBytes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			clientcert, clientkey := loadClientCredentials(t)
+			cacert, cakey := createCaCertWithKeyUsage(t, test.keyUsage)
+			tmpl := &scep.PKIMessage{
+				MessageType: scep.PKCSReq,
+				Recipients:  []*x509.Certificate{cacert},
+				SignerCert:  clientcert,
+				SignerKey:   clientkey,
+			}
 
-	pkcsreq, err := scep.NewCSRRequest(csr, tmpl)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg := testParsePKIMessage(t, pkcsreq.Raw)
-	err = msg.DecryptPKIEnvelope(cacert, cakey)
-	if err != nil {
-		t.Fatal(err)
+			pkcsreq, err := scep.NewCSRRequest(csr, tmpl)
+			if test.shouldCreateCSR && err != nil {
+				t.Fatalf("keyUsage: %d, failed creating a CSR request: %v", test.keyUsage, err)
+			}
+			if !test.shouldCreateCSR && err == nil {
+				t.Fatalf("keyUsage: %d, shouldn't have created a CSR: %v", test.keyUsage, err)
+			}
+			if !test.shouldCreateCSR {
+				return
+			}
+			msg := testParsePKIMessage(t, pkcsreq.Raw)
+			err = msg.DecryptPKIEnvelope(cacert, cakey)
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 
@@ -194,6 +213,41 @@ func loadTestFile(t *testing.T, path string) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+// createCaCertWithKeyUsage generates a CA key and certificate with keyUsage.
+func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certificate, *rsa.PrivateKey) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	subject := pkix.Name{
+		Country:      []string{"US"},
+		Organization: []string{"MICROMDM"},
+		CommonName:   "MICROMDM SCEP CA",
+	}
+	subjectKeyID, err := GenerateSubjectKeyID(&key.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	authTemplate := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      subject,
+		NotBefore:    time.Now().Add(-600).UTC(),
+		NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
+		KeyUsage:     keyUsage,
+		IsCA:         true,
+		SubjectKeyId: subjectKeyID,
+	}
+	crtBytes, err := x509.CreateCertificate(rand.Reader, &authTemplate, &authTemplate, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cert, err := x509.ParseCertificate(crtBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return cert, key
 }
 
 func loadCACredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
@@ -294,6 +348,7 @@ type rsaPublicKey struct {
 
 // GenerateSubjectKeyID generates SubjectKeyId used in Certificate
 // ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
+// TODO(issue/138): generateSubjectKeyID function is duplicated 6 times
 func GenerateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	var pubBytes []byte
 	var err error

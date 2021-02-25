@@ -555,7 +555,11 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	}
 
 	derBytes := csr.Raw
-	e7, err := pkcs7.Encrypt(derBytes, tmpl.Recipients)
+	recipients := filterCertificatesByKeyUsage(tmpl.Recipients, x509.KeyUsageKeyEncipherment)
+	if len(recipients) == 0 {
+		return nil, errors.New("no recipients that can be used for KeyEncipherment.")
+	}
+	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
 		return nil, err
 	}
@@ -676,4 +680,13 @@ func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
 	hash := sha1.Sum(pubBytes)
 
 	return hash[:], nil
+}
+
+func filterCertificatesByKeyUsage(recipients []*x509.Certificate, keyUsage x509.KeyUsage) (filtered []*x509.Certificate) {
+	for _, cert := range recipients {
+		if cert.KeyUsage&keyUsage == keyUsage {
+			filtered = append(filtered, cert)
+		}
+	}
+	return filtered
 }

@@ -279,7 +279,7 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 		Subject:            subject,
 		NotBefore:          time.Now().Add(-600).UTC(),
 		NotAfter:           time.Now().AddDate(years, 0, 0).UTC(),
-		KeyUsage:           x509.KeyUsageCertSign,
+		KeyUsage:           x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:        nil,
 		UnknownExtKeyUsage: nil,
 
