@@ -177,7 +177,7 @@ func newCSR(priv *rsa.PrivateKey, email, country, cname string) ([]byte, error) 
 	subj := pkix.Name{
 		Country:    []string{country},
 		CommonName: cname,
-		ExtraNames: []pkix.AttributeTypeAndValue{pkix.AttributeTypeAndValue{
+		ExtraNames: []pkix.AttributeTypeAndValue{{
 			Type:  []int{1, 2, 840, 113549, 1, 9, 1},
 			Value: email,
 		}},

@@ -283,7 +283,7 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 		ExtKeyUsage:        nil,
 		UnknownExtKeyUsage: nil,
 
-		BasicConstraintsValid: true,
+		BasicConstraintsValid:       true,
 		IsCA:                        true,
 		MaxPathLen:                  0,
 		SubjectKeyId:                subjectKeyID,
