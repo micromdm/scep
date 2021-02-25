@@ -226,7 +226,7 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 		Organization: []string{"MICROMDM"},
 		CommonName:   "MICROMDM SCEP CA",
 	}
-	subjectKeyID, err := generateSubjectKeyID(&key.PublicKey)
+	subjectKeyID, err := GenerateSubjectKeyID(&key.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,29 +248,6 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 		t.Fatal(err)
 	}
 	return cert, key
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("only RSA public key is supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
 }
 
 func loadCACredentials(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
