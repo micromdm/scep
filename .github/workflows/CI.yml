@@ -7,7 +7,7 @@ on:
     types: [opened, reopened, synchronize]
 
 jobs:
-  build-test-format:
+  build-test:
     name: Build, test & format
     strategy:
       matrix:
@@ -29,4 +29,5 @@ jobs:
       run: go test -v ./...
 
     - name: Format
+      if: matrix.platform == 'macos-latest'
       run: if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then exit 1; fi
