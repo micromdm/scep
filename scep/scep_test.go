@@ -1,13 +1,10 @@
 package scep_test
 
 import (
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
@@ -15,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/micromdm/scep/cryptoutil"
 	"github.com/micromdm/scep/scep"
 )
 
@@ -99,7 +97,7 @@ func TestSignCSR(t *testing.T) {
 		t.Fatal(err)
 	}
 	csr := msg.CSRReqMessage.CSR
-	id, err := GenerateSubjectKeyID(csr.PublicKey)
+	id, err := cryptoutil.GenerateSubjectKeyID(csr.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +224,7 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 		Organization: []string{"MICROMDM"},
 		CommonName:   "MICROMDM SCEP CA",
 	}
-	subjectKeyID, err := GenerateSubjectKeyID(&key.PublicKey)
+	subjectKeyID, err := cryptoutil.GenerateSubjectKeyID(&key.PublicKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -338,34 +336,4 @@ func decodePEMCert(t *testing.T, data []byte) *x509.Certificate {
 		t.Fatal(err)
 	}
 	return cert
-}
-
-// rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.
-type rsaPublicKey struct {
-	N *big.Int
-	E int
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-// TODO(issue/138): generateSubjectKeyID function is duplicated 6 times
-func GenerateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("only RSA public key is supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
 }

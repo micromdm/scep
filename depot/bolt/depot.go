@@ -2,19 +2,17 @@ package bolt
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/boltdb/bolt"
+	"github.com/micromdm/scep/cryptoutil"
 )
 
 // Depot implements a SCEP certifiacte store using boltdb.
@@ -269,7 +267,7 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 		CommonName:         org,
 	}
 
-	subjectKeyID, err := generateSubjectKeyID(&key.PublicKey)
+	subjectKeyID, err := cryptoutil.GenerateSubjectKeyID(&key.PublicKey)
 	if err != nil {
 		return nil, err
 	}
@@ -314,27 +312,4 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 type rsaPublicKey struct {
 	N *big.Int
 	E int
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("only RSA public key is supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
 }

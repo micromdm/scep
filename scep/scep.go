@@ -6,11 +6,8 @@ package scep
 import (
 	"bytes"
 	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
@@ -18,10 +15,11 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/micromdm/scep/cryptoutil"
 	"github.com/pkg/errors"
 	"go.mozilla.org/pkcs7"
 
-	"github.com/micromdm/scep/crypto/x509util"
+	"github.com/micromdm/scep/cryptoutil/x509util"
 )
 
 // errors
@@ -642,7 +640,7 @@ func newNonce() (SenderNonce, error) {
 
 // use public key to create a deterministric transactionID
 func newTransactionID(key crypto.PublicKey) (TransactionID, error) {
-	id, err := generateSubjectKeyID(key)
+	id, err := cryptoutil.GenerateSubjectKeyID(key)
 	if err != nil {
 		return "", err
 	}
@@ -655,31 +653,6 @@ func newTransactionID(key crypto.PublicKey) (TransactionID, error) {
 type rsaPublicKey struct {
 	N *big.Int
 	E int
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	case *ecdsa.PublicKey:
-		pubBytes = elliptic.Marshal(pub.Curve, pub.X, pub.Y)
-	default:
-		return nil, errors.New("only ECDSA and RSA public keys are supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
 }
 
 func filterCertificatesByKeyUsage(recipients []*x509.Certificate, keyUsage x509.KeyUsage) (filtered []*x509.Certificate) {

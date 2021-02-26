@@ -1,16 +1,12 @@
 package depot
 
 import (
-	"crypto"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
-	"encoding/asn1"
-	"errors"
 	"math/big"
 	"time"
 
+	"github.com/micromdm/scep/cryptoutil"
 	scepserver "github.com/micromdm/scep/server"
 
 	"github.com/micromdm/scep/scep"
@@ -20,7 +16,7 @@ import (
 func CSRSigner(depot Depot, allowRenewal, clientValidity int, caPass string) scepserver.CSRSignerFunc {
 	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		csr := m.CSR
-		id, err := generateSubjectKeyID(csr.PublicKey)
+		id, err := cryptoutil.GenerateSubjectKeyID(csr.PublicKey)
 		if err != nil {
 			return nil, err
 		}
@@ -90,27 +86,4 @@ func certName(crt *x509.Certificate) string {
 type rsaPublicKey struct {
 	N *big.Int
 	E int
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("only RSA public key is supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
 }
