@@ -1,15 +1,11 @@
 package main
 
 import (
-	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/asn1"
 	"encoding/pem"
-	"errors"
 	"flag"
 	"fmt"
 	"math/big"
@@ -23,6 +19,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/micromdm/scep/cryptoutil"
 	"github.com/micromdm/scep/csrverifier"
 	executablecsrverifier "github.com/micromdm/scep/csrverifier/executable"
 	scepdepot "github.com/micromdm/scep/depot"
@@ -283,7 +280,7 @@ func createCertificateAuthority(key *rsa.PrivateKey, years int, organization str
 		}
 	)
 
-	subjectKeyID, err := generateSubjectKeyID(&key.PublicKey)
+	subjectKeyID, err := cryptoutil.GenerateSubjectKeyID(&key.PublicKey)
 	if err != nil {
 		return err
 	}
@@ -317,35 +314,6 @@ const (
 	rsaPrivateKeyPEMBlockType = "RSA PRIVATE KEY"
 	certificatePEMBlockType   = "CERTIFICATE"
 )
-
-// rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.
-type rsaPublicKey struct {
-	N *big.Int
-	E int
-}
-
-// GenerateSubjectKeyID generates SubjectKeyId used in Certificate
-// ID is 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-func generateSubjectKeyID(pub crypto.PublicKey) ([]byte, error) {
-	var pubBytes []byte
-	var err error
-	switch pub := pub.(type) {
-	case *rsa.PublicKey:
-		pubBytes, err = asn1.Marshal(rsaPublicKey{
-			N: pub.N,
-			E: pub.E,
-		})
-		if err != nil {
-			return nil, err
-		}
-	default:
-		return nil, errors.New("only RSA public key is supported")
-	}
-
-	hash := sha1.Sum(pubBytes)
-
-	return hash[:], nil
-}
 
 func pemCert(derBytes []byte) []byte {
 	pemBlock := &pem.Block{
