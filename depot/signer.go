@@ -3,7 +3,6 @@ package depot
 import (
 	"crypto/rand"
 	"crypto/x509"
-	"math/big"
 	"time"
 
 	"github.com/micromdm/scep/cryptoutil"
@@ -80,10 +79,4 @@ func certName(crt *x509.Certificate) string {
 		return crt.Subject.CommonName
 	}
 	return string(crt.Signature)
-}
-
-// rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.
-type rsaPublicKey struct {
-	N *big.Int
-	E int
 }

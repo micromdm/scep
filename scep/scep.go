@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
-	"math/big"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -647,12 +646,6 @@ func newTransactionID(key crypto.PublicKey) (TransactionID, error) {
 
 	encHash := base64.StdEncoding.EncodeToString(id)
 	return TransactionID(encHash), nil
-}
-
-// rsaPublicKey reflects the ASN.1 structure of a PKCS#1 public key.
-type rsaPublicKey struct {
-	N *big.Int
-	E int
 }
 
 func filterCertificatesByKeyUsage(recipients []*x509.Certificate, keyUsage x509.KeyUsage) (filtered []*x509.Certificate) {
