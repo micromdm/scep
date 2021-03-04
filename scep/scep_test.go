@@ -134,7 +134,7 @@ func TestNewCSRRequest(t *testing.T) {
 		keyUsage        x509.KeyUsage
 		shouldCreateCSR bool
 	}{
-		{"KeyEncipherment not set", x509.KeyUsageDigitalSignature, false},
+		{"KeyEncipherment not set", x509.KeyUsageDigitalSignature, true},
 		{"KeyEncipherment is set", x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature, true},
 	} {
 		test := test
