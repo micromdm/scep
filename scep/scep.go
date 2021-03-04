@@ -554,7 +554,8 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	derBytes := csr.Raw
 	recipients := filterCertificatesByKeyUsage(tmpl.Recipients, x509.KeyUsageKeyEncipherment)
 	if len(recipients) == 0 {
-		return nil, errors.New("no recipients that can be used for KeyEncipherment.")
+		// fall back to using non-filtered certs
+		recipients = tmpl.Recipients
 	}
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
