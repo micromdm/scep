@@ -2,6 +2,11 @@ package scep
 
 import "crypto/x509"
 
+// A CertsSelector filters certificates.
+type CertsSelector interface {
+	SelectCerts([]*x509.Certificate) []*x509.Certificate
+}
+
 // CertsSelectorFunc is a type of function that filters certificates.
 type CertsSelectorFunc func([]*x509.Certificate) []*x509.Certificate
 
@@ -17,7 +22,7 @@ func NopCertsSelector() CertsSelectorFunc {
 }
 
 // A EnciphermentCertsSelector returns a CertsSelectorFunc that selects
-// certificates eligible for key encipherment. This certsSelectorFunc can be used
+// certificates eligible for key encipherment. This certsSelector can be used
 // to filter PKCSReq recipients.
 func EnciphermentCertsSelector() CertsSelectorFunc {
 	return func(certs []*x509.Certificate) (selected []*x509.Certificate) {

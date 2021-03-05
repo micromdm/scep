@@ -136,25 +136,25 @@ func TestNewCSRRequest(t *testing.T) {
 		shouldCreateCSR   bool
 	}{
 		{
-			"KeyEncipherment not set with NOP certificates certsSelectorFunc",
+			"KeyEncipherment not set with NOP certificates selector",
 			x509.KeyUsageCertSign,
 			scep.NopCertsSelector(),
 			true,
 		},
 		{
-			"KeyEncipherment is set with NOP certificates certsSelectorFunc",
+			"KeyEncipherment is set with NOP certificates selector",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
 			scep.NopCertsSelector(),
 			true,
 		},
 		{
-			"KeyEncipherment not set with Encipherment certificates certsSelectorFunc",
+			"KeyEncipherment not set with Encipherment certificates selector",
 			x509.KeyUsageCertSign,
 			scep.EnciphermentCertsSelector(),
 			false,
 		},
 		{
-			"KeyEncipherment is set with Encipherment certificates certsSelectorFunc",
+			"KeyEncipherment is set with Encipherment certificates selector",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
 			scep.EnciphermentCertsSelector(),
 			true,
