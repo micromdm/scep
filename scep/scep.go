@@ -152,14 +152,14 @@ func WithCACerts(caCerts []*x509.Certificate) Option {
 	}
 }
 
-// WithCertsSelector adds the certificates selector option to the SCEP
+// WithCertsSelector adds the certificates certsSelectorFunc option to the SCEP
 // operations.
 // This option is effective when used with NewCSRRequest function. In
-// this case, only certificates selected with the selector will be used
+// this case, only certificates selected with the certsSelectorFunc will be used
 // as the PKCS #7 message recipients.
-func WithCertsSelector(selector CertsSelector) Option {
+func WithCertsSelector(selector CertsSelectorFunc) Option {
 	return func(c *config) {
-		c.selector = selector
+		c.certsSelectorFunc = selector
 	}
 }
 
@@ -167,9 +167,9 @@ func WithCertsSelector(selector CertsSelector) Option {
 type Option func(*config)
 
 type config struct {
-	logger   log.Logger
-	caCerts  []*x509.Certificate // specified if CA certificates have already been retrieved
-	selector CertsSelector
+	logger            log.Logger
+	caCerts           []*x509.Certificate // specified if CA certificates have already been retrieved
+	certsSelectorFunc CertsSelectorFunc
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -558,13 +558,13 @@ func CACerts(data []byte) ([]*x509.Certificate, error) {
 
 // NewCSRRequest creates a scep PKI PKCSReq/UpdateReq message
 func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Option) (*PKIMessage, error) {
-	conf := &config{logger: log.NewNopLogger(), selector: NopCertsSelector{}}
+	conf := &config{logger: log.NewNopLogger(), certsSelectorFunc: NopCertsSelector()}
 	for _, opt := range opts {
 		opt(conf)
 	}
 
 	derBytes := csr.Raw
-	recipients := conf.selector.SelectCerts(tmpl.Recipients)
+	recipients := conf.certsSelectorFunc.SelectCerts(tmpl.Recipients)
 	if len(recipients) == 0 {
 		return nil, errors.New("no recipients that can be used for KeyEncipherment.")
 	}

@@ -36,7 +36,7 @@ func TestEnciphermentCertsSelector(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			t.Parallel()
 
-			selected := EnciphermentCertsSelector{}.SelectCerts(test.certs)
+			selected := EnciphermentCertsSelector().SelectCerts(test.certs)
 			if !certsKeyUsagesEq(selected, test.expectedSelectedCerts) {
 				t.Fatal("selected and expected certificates did not match")
 			}
@@ -77,7 +77,7 @@ func TestNopCertsSelector(t *testing.T) {
 		t.Run(test.testName, func(t *testing.T) {
 			t.Parallel()
 
-			selected := NopCertsSelector{}.SelectCerts(test.certs)
+			selected := NopCertsSelector().SelectCerts(test.certs)
 			if !certsKeyUsagesEq(selected, test.expectedSelectedCerts) {
 				t.Fatal("selected and expected certificates did not match")
 			}

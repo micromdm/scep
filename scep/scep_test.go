@@ -130,33 +130,33 @@ func TestSignCSR(t *testing.T) {
 
 func TestNewCSRRequest(t *testing.T) {
 	for _, test := range []struct {
-		testName        string
-		keyUsage        x509.KeyUsage
-		selector        scep.CertsSelector
-		shouldCreateCSR bool
+		testName          string
+		keyUsage          x509.KeyUsage
+		certsSelectorFunc scep.CertsSelectorFunc
+		shouldCreateCSR   bool
 	}{
 		{
-			"KeyEncipherment not set with NOP certificates selector",
+			"KeyEncipherment not set with NOP certificates certsSelectorFunc",
 			x509.KeyUsageCertSign,
-			scep.NopCertsSelector{},
+			scep.NopCertsSelector(),
 			true,
 		},
 		{
-			"KeyEncipherment is set with NOP certificates selector",
+			"KeyEncipherment is set with NOP certificates certsSelectorFunc",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-			scep.NopCertsSelector{},
+			scep.NopCertsSelector(),
 			true,
 		},
 		{
-			"KeyEncipherment not set with Encipherment certificates selector",
+			"KeyEncipherment not set with Encipherment certificates certsSelectorFunc",
 			x509.KeyUsageCertSign,
-			scep.EnciphermentCertsSelector{},
+			scep.EnciphermentCertsSelector(),
 			false,
 		},
 		{
-			"KeyEncipherment is set with Encipherment certificates selector",
+			"KeyEncipherment is set with Encipherment certificates certsSelectorFunc",
 			x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-			scep.EnciphermentCertsSelector{},
+			scep.EnciphermentCertsSelector(),
 			true,
 		},
 	} {
@@ -184,7 +184,7 @@ func TestNewCSRRequest(t *testing.T) {
 				SignerKey:   clientkey,
 			}
 
-			pkcsreq, err := scep.NewCSRRequest(csr, tmpl, scep.WithCertsSelector(test.selector))
+			pkcsreq, err := scep.NewCSRRequest(csr, tmpl, scep.WithCertsSelector(test.certsSelectorFunc))
 			if test.shouldCreateCSR && err != nil {
 				t.Fatalf("keyUsage: %d, failed creating a CSR request: %v", test.keyUsage, err)
 			}
