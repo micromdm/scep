@@ -40,6 +40,20 @@ func NewBoltDepot(db *bolt.DB) (*Depot, error) {
 	return &Depot{db}, nil
 }
 
+// For some read operations Bolt returns a direct memory reference to
+// the underlying mmap. This means that persistent references to these
+// memory locations are volatile. Make sure to copy data for places we
+// know references to this memeory will be kept.
+func bucketGetCopy(b *bolt.Bucket, key []byte) (out []byte) {
+	in := b.Get(key)
+	if in == nil {
+		return
+	}
+	out = make([]byte, len(in))
+	copy(out, in)
+	return
+}
+
 func (db *Depot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
 	chain := []*x509.Certificate{}
 	var key *rsa.PrivateKey
@@ -49,15 +63,11 @@ func (db *Depot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
 			return fmt.Errorf("bucket %q not found!", certBucket)
 		}
 		// get ca_certificate
-		caCert := bucket.Get([]byte("ca_certificate"))
+		caCert := bucketGetCopy(bucket, []byte("ca_certificate"))
 		if caCert == nil {
 			return fmt.Errorf("no ca_certificate in bucket")
 		}
-		// we need to make a copy of the byte slice because the asn.Unmarshal
-		// method called by ParseCertificate will retain a reference to the original.
-		// The slice should no longer be referenced once the BoltDB transaction is closed.
-		caCertBytes := append([]byte(nil), caCert...)
-		cert, err := x509.ParseCertificate(caCertBytes)
+		cert, err := x509.ParseCertificate(caCert)
 		if err != nil {
 			return err
 		}
@@ -241,7 +251,7 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 		if bucket == nil {
 			return fmt.Errorf("bucket %q not found!", certBucket)
 		}
-		caCert := bucket.Get([]byte("ca_certificate"))
+		caCert := bucketGetCopy(bucket, []byte("ca_certificate"))
 		if caCert == nil {
 			return nil
 		}
