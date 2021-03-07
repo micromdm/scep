@@ -43,7 +43,7 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 	template := x509util.CertificateRequest{
 		CertificateRequest: x509.CertificateRequest{
 			Subject:            subject,
-			SignatureAlgorithm: x509.SHA1WithRSA,
+			SignatureAlgorithm: x509.SHA256WithRSA,
 		},
 	}
 	if opts.challenge != "" {
