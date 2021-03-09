@@ -6,8 +6,9 @@ import (
 	"crypto/x509"
 	"errors"
 
-	"github.com/go-kit/kit/log"
 	"github.com/micromdm/scep/scep"
+
+	"github.com/go-kit/kit/log"
 )
 
 // Service is the interface for all supported SCEP server operations.
@@ -29,22 +30,6 @@ type Service interface {
 	// when the old one expires. The response format is a PKCS#7 Degenerate
 	// Certificates type.
 	GetNextCACert(ctx context.Context) ([]byte, error)
-}
-
-// CSRSigner is a handler for CSR signing by the CA/RA
-//
-// SignCSR should take the CSR in the CSRReqMessage and return a
-// Certificate signed by the CA.
-type CSRSigner interface {
-	SignCSR(*scep.CSRReqMessage) (*x509.Certificate, error)
-}
-
-// CSRSignerFunc is an adapter for CSR signing by the CA/RA
-type CSRSignerFunc func(*scep.CSRReqMessage) (*x509.Certificate, error)
-
-// SignCSR calls f(m)
-func (f CSRSignerFunc) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
-	return f(m)
 }
 
 type service struct {
@@ -128,33 +113,6 @@ func WithLogger(logger log.Logger) ServiceOption {
 func WithAddlCA(ca *x509.Certificate) ServiceOption {
 	return func(s *service) error {
 		s.addlCa = append(s.addlCa, ca)
-		return nil
-	}
-}
-
-func staticChallengePasswordCSRSignerMiddleware(pw string, next CSRSigner) CSRSignerFunc {
-	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
-		// TODO: this was only verified in the old version if our MessageType was PKCSReq
-		if pw != m.ChallengePassword {
-			return nil, errors.New("challenge password mismatch")
-		}
-		return next.SignCSR(m)
-	}
-}
-
-// WithStaticChallengePassword wraps the service signer function in
-// a middleware that checks for matching challenge passwords
-func WithStaticChallengePassword(pw string) ServiceOption {
-	return func(s *service) error {
-		s.signer = staticChallengePasswordCSRSignerMiddleware(pw, s.signer)
-		return nil
-	}
-}
-
-// WithCSRSignerMiddleware wraps the service
-func WithCSRSignerMiddleware(f func(CSRSigner) CSRSigner) ServiceOption {
-	return func(s *service) error {
-		s.signer = f(s.signer)
 		return nil
 	}
 }

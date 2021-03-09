@@ -1,7 +1,6 @@
 package challenge
 
 import (
-	"crypto/x509"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -63,11 +62,7 @@ func TestDynamicChallenge(t *testing.T) {
 	}
 
 	// test CSRSigner middleware
-	nullSigner := scepserver.CSRSignerFunc(func(*scep.CSRReqMessage) (*x509.Certificate, error) {
-		return nil, nil
-	})
-	mw := NewCSRSignerMiddleware(depot)
-	signer := mw(nullSigner)
+	signer := Middleware(depot, scepserver.NopCSRSigner())
 
 	csrReq := &scep.CSRReqMessage{
 		ChallengePassword: challengePassword,

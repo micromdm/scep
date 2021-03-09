@@ -14,22 +14,16 @@ type CSRVerifier interface {
 	Verify(data []byte) (bool, error)
 }
 
-func csrSignerMiddleWare(verifier CSRVerifier, next scepserver.CSRSigner) scepserver.CSRSignerFunc {
+// Middleware wraps next in a CSRSigner that runs verifier
+func Middleware(verifier CSRVerifier, next scepserver.CSRSigner) scepserver.CSRSignerFunc {
 	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
-		result, err := verifier.Verify(m.RawDecrypted)
+		ok, err := verifier.Verify(m.RawDecrypted)
 		if err != nil {
 			return nil, err
 		}
-		if !result {
-			return nil, errors.New("CSR failed verification")
+		if !ok {
+			return nil, errors.New("CSR verify failed")
 		}
 		return next.SignCSR(m)
-	}
-}
-
-// NewCSRSignerMiddleware creates a new middleware adaptor
-func NewCSRSignerMiddleware(verifier CSRVerifier) func(scepserver.CSRSigner) scepserver.CSRSigner {
-	return func(f scepserver.CSRSigner) scepserver.CSRSigner {
-		return csrSignerMiddleWare(verifier, f)
 	}
 }

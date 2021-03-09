@@ -121,15 +121,6 @@ func main() {
 
 	var svc scepserver.Service // scep service
 	{
-		svcOptions := []scepserver.ServiceOption{
-			scepserver.WithLogger(logger),
-		}
-		if *flChallengePassword != "" {
-			svcOptions = append(svcOptions, scepserver.WithStaticChallengePassword(*flChallengePassword))
-		}
-		if csrVerifier != nil {
-			svcOptions = append(svcOptions, scepserver.WithCSRSignerMiddleware(csrverifier.NewCSRSignerMiddleware(csrVerifier)))
-		}
 		crts, key, err := depot.CA([]byte(*flCAPass))
 		if err != nil {
 			lginfo.Log("err", err)
@@ -140,7 +131,13 @@ func main() {
 			os.Exit(1)
 		}
 		signer := scepdepot.CSRSigner(depot, allowRenewal, clientValidity, *flCAPass)
-		svc, err = scepserver.NewService(crts[0], key, signer, svcOptions...)
+		if *flChallengePassword != "" {
+			signer = scepserver.ChallengeMiddleware(*flChallengePassword, signer)
+		}
+		if csrVerifier != nil {
+			signer = csrverifier.Middleware(csrVerifier, signer)
+		}
+		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger))
 		if err != nil {
 			lginfo.Log("err", err)
 			os.Exit(1)
