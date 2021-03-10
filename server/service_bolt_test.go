@@ -45,7 +45,7 @@ func TestCaCert(t *testing.T) {
 	caCert := certs[0]
 
 	// SCEP service
-	svc, err := scepserver.NewService(caCert, key, scepdepot.CSRSigner(depot, 14, 365, ""))
+	svc, err := scepserver.NewService(caCert, key, scepdepot.NewSigner(depot))
 	if err != nil {
 		t.Fatal(err)
 	}
