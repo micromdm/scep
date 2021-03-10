@@ -15,23 +15,17 @@ type Store interface {
 	HasChallenge(pw string) (bool, error)
 }
 
-func csrSignerMiddleWare(store Store, next scepserver.CSRSigner) scepserver.CSRSignerFunc {
+// Middleware wraps next in a CSRSigner that verifies and invalidates the challenge
+func Middleware(store Store, next scepserver.CSRSigner) scepserver.CSRSignerFunc {
 	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
-		// TODO: this was only verified in the old version if our MessageType was PKCSReq
+		// TODO: compare challenge only for PKCSReq?
 		valid, err := store.HasChallenge(m.ChallengePassword)
 		if err != nil {
 			return nil, err
 		}
 		if !valid {
-			return nil, errors.New("invalid SCEP challenge")
+			return nil, errors.New("invalid challenge")
 		}
 		return next.SignCSR(m)
-	}
-}
-
-// NewCSRSignerMiddleware creates a new middleware adaptor
-func NewCSRSignerMiddleware(store Store) func(scepserver.CSRSigner) scepserver.CSRSigner {
-	return func(f scepserver.CSRSigner) scepserver.CSRSigner {
-		return csrSignerMiddleWare(store, f)
 	}
 }
