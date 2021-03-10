@@ -130,7 +130,12 @@ func main() {
 			lginfo.Log("err", "missing CA certificate")
 			os.Exit(1)
 		}
-		signer := scepdepot.CSRSigner(depot, allowRenewal, clientValidity, *flCAPass)
+		var signer scepserver.CSRSigner = scepdepot.NewSigner(
+			depot,
+			scepdepot.WithAllowRenewalDays(allowRenewal),
+			scepdepot.WithValidityDays(clientValidity),
+			scepdepot.WithCAPass(*flCAPass),
+		)
 		if *flChallengePassword != "" {
 			signer = scepserver.ChallengeMiddleware(*flChallengePassword, signer)
 		}
