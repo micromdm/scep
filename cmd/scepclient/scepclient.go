@@ -23,8 +23,7 @@ import (
 
 // version info
 var (
-	version = "unreleased"
-	gitHash = "unknown"
+	version = "unknown"
 )
 
 type runCfg struct {
@@ -276,8 +275,7 @@ func main() {
 
 	// print version information
 	if *flVersion {
-		fmt.Printf("scepclient - %v\n", version)
-		fmt.Printf("git revision - %v\n", gitHash)
+		fmt.Println(version)
 		os.Exit(0)
 	}
 
