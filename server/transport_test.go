@@ -14,15 +14,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
-
-	"github.com/micromdm/scep/scep"
-
-	kitlog "github.com/go-kit/kit/log"
 
 	"github.com/micromdm/scep/depot"
 	filedepot "github.com/micromdm/scep/depot/file"
 	scepserver "github.com/micromdm/scep/server"
+
+	kitlog "github.com/go-kit/kit/log"
 )
 
 func TestCACaps(t *testing.T) {
@@ -75,6 +74,22 @@ func TestEncodePKCSReq_Request(t *testing.T) {
 
 }
 
+func TestGetCACertMessage(t *testing.T) {
+	testMsg := "testMsg"
+	sr := scepserver.SCEPRequest{Operation: "GetCACert", Message: []byte(testMsg)}
+	req, err := http.NewRequest("GET", "http://127.0.0.1:8080/scep", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = scepserver.EncodeSCEPRequest(context.Background(), req, sr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(req.URL.RawQuery, "message="+testMsg) {
+		t.Fatal("RawQuery does not contain message")
+	}
+}
+
 func TestPKIOperation(t *testing.T) {
 	server, _, teardown := newServer(t)
 	defer teardown()
@@ -123,12 +138,9 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 		depot = &noopDepot{depot}
 	}
 	crt, key, err := depot.CA([]byte{})
-	nullSigner := scepserver.CSRSignerFunc(func(*scep.CSRReqMessage) (*x509.Certificate, error) {
-		return nil, nil
-	})
 	var svc scepserver.Service // scep service
 	{
-		svc, err = scepserver.NewService(crt[0], key, nullSigner)
+		svc, err = scepserver.NewService(crt[0], key, scepserver.NopCSRSigner())
 		if err != nil {
 			t.Fatal(err)
 		}

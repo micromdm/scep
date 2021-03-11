@@ -104,7 +104,7 @@ func run(cfg runCfg) error {
 		self = s
 	}
 
-	resp, certNum, err := client.GetCACert(ctx)
+	resp, certNum, err := client.GetCACert(ctx, "")
 	if err != nil {
 		return err
 	}

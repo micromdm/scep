@@ -29,15 +29,16 @@ func (mw *loggingService) GetCACaps(ctx context.Context) (caps []byte, err error
 	return
 }
 
-func (mw *loggingService) GetCACert(ctx context.Context) (cert []byte, certNum int, err error) {
+func (mw *loggingService) GetCACert(ctx context.Context, message string) (cert []byte, certNum int, err error) {
 	defer func(begin time.Time) {
 		_ = mw.logger.Log(
 			"method", "GetCACert",
+			"message", message,
 			"err", err,
 			"took", time.Since(begin),
 		)
 	}(time.Now())
-	cert, certNum, err = mw.Service.GetCACert(ctx)
+	cert, certNum, err = mw.Service.GetCACert(ctx, message)
 	return
 }
 

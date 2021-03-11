@@ -75,7 +75,7 @@ func TestCaCert(t *testing.T) {
 	ctx := context.Background()
 	for i := 0; i < 5; i++ {
 		// check CA
-		caBytes, num, err := svc.GetCACert(ctx)
+		caBytes, num, err := svc.GetCACert(ctx, "")
 		if err != nil {
 			t.Fatal(err)
 		}
