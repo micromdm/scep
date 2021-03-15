@@ -16,6 +16,8 @@ SCEPSERVER=\
 
 my: scepclient-$(OSARCH) scepserver-$(OSARCH)
 
+docker: scepclient-linux-amd64 scepserver-linux-amd64
+
 $(SCEPCLIENT):
 	GOOS=$(word 2,$(subst -, ,$@)) GOARCH=$(word 3,$(subst -, ,$(subst .exe,,$@))) go build $(LDFLAGS) -o $@ ./cmd/scepclient
 
@@ -42,4 +44,4 @@ test:
 test-race:
 	go test -cover -race ./...
 
-.PHONY: my $(SCEPCLIENT) $(SCEPSERVER) release clean test test-race 
+.PHONY: my docker $(SCEPCLIENT) $(SCEPSERVER) release clean test test-race
