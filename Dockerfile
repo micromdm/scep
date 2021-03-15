@@ -5,6 +5,6 @@ COPY ./scepserver-linux-amd64 /usr/bin/scepserver
 
 EXPOSE 8080
 
-RUN ["/usr/bin/scepserver", "ca", "-init"]
+RUN scepserver ca -init
 
-CMD ["/usr/bin/scepserver"]
+CMD scepserver
