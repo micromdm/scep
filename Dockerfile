@@ -5,6 +5,4 @@ COPY ./scepserver-linux-amd64 /usr/bin/scepserver
 
 EXPOSE 8080
 
-RUN scepserver ca -init
-
-CMD scepserver
+ENTRYPOINT ["scepserver"]
