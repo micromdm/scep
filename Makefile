@@ -1,28 +1,47 @@
-.PHONY: build
+VERSION=$(shell git describe --tags --always --dirty)
+LDFLAGS=-ldflags "-X main.version=$(VERSION)"
+OSARCH=$(shell go env GOHOSTOS)-$(shell go env GOHOSTARCH)
 
-export GO111MODULE=on
+SCEPCLIENT=\
+	scepclient-linux-amd64 \
+	scepclient-darwin-amd64 \
+	scepclient-freebsd-amd64 \
+	scepclient-windows-amd64.exe \
 
-all: build
+SCEPSERVER=\
+	scepserver-linux-amd64 \
+	scepserver-darwin-amd64 \
+	scepserver-freebsd-amd64 \
+	scepserver-windows-amd64.exe
 
-.pre:
-	mkdir -p build
+my: scepclient-$(OSARCH) scepserver-$(OSARCH)
 
-gomodcheck: 
-	@go help mod > /dev/null || (@echo micromdm requires Go version 1.11 or higher && exit 1)
+docker: scepclient-linux-amd64 scepserver-linux-amd64
 
-deps: gomodcheck
-	@go mod download
+$(SCEPCLIENT):
+	GOOS=$(word 2,$(subst -, ,$@)) GOARCH=$(word 3,$(subst -, ,$(subst .exe,,$@))) go build $(LDFLAGS) -o $@ ./cmd/scepclient
+
+$(SCEPSERVER):
+	GOOS=$(word 2,$(subst -, ,$@)) GOARCH=$(word 3,$(subst -, ,$(subst .exe,,$@))) go build $(LDFLAGS) -o $@ ./cmd/scepserver
+
+%-$(VERSION).zip: %.exe
+	rm -f $@
+	zip $@ $<
+
+%-$(VERSION).zip: %
+	rm -f $@
+	zip $@ $<
+
+release: $(foreach bin,$(SCEPCLIENT) $(SCEPSERVER),$(subst .exe,,$(bin))-$(VERSION).zip)
+
+clean:
+	rm -f scepclient-* scepserver-*
 
 test:
 	go test -cover ./...
 
-testrace:
+# don't run race tests by default. see https://github.com/etcd-io/bbolt/issues/187
+test-race:
 	go test -cover -race ./...
 
-build: build-scepclient build-scepserver
-
-build-scepclient: .pre
-	cd cmd/scepclient && ./release.sh
-
-build-scepserver: .pre
-	cd cmd/scepserver && ./release.sh
+.PHONY: my docker $(SCEPCLIENT) $(SCEPSERVER) release clean test test-race
