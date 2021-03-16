@@ -48,7 +48,12 @@ func EncodeSCEPRequest(ctx context.Context, r *http.Request, request interface{}
 	switch r.Method {
 	case "GET":
 		if len(req.Message) > 0 {
-			msg := base64.URLEncoding.EncodeToString(req.Message)
+			var msg string
+			if req.Operation == "PKIOperation" {
+				msg = base64.URLEncoding.EncodeToString(req.Message)
+			} else {
+				msg = string(req.Message)
+			}
 			params.Set("message", msg)
 		}
 		r.URL.RawQuery = params.Encode()

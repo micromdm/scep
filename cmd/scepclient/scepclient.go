@@ -44,6 +44,7 @@ type runCfg struct {
 	caMD5        string
 	debug        bool
 	logfmt       string
+	caCertMsg    string
 }
 
 func run(cfg runCfg) error {
@@ -103,7 +104,7 @@ func run(cfg runCfg) error {
 		self = s
 	}
 
-	resp, certNum, err := client.GetCACert(ctx)
+	resp, certNum, err := client.GetCACert(ctx, cfg.caCertMsg)
 	if err != nil {
 		return err
 	}
@@ -263,6 +264,7 @@ func main() {
 		flLoc               = flag.String("locality", "", "locality for certificate")
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
+		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
@@ -313,6 +315,7 @@ func main() {
 		caMD5:        *flCAFingerprint,
 		debug:        *flDebugLogging,
 		logfmt:       logfmt,
+		caCertMsg:    *flCACertMessage,
 	}
 
 	if err := run(cfg); err != nil {
