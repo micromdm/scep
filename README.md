@@ -1,53 +1,59 @@
-[![CI](https://github.com/micromdm/scep/workflows/CI/badge.svg)](https://github.com/micromdm/scep/actions)
+# scep
 
+[![CI](https://github.com/micromdm/scep/workflows/CI/badge.svg)](https://github.com/micromdm/scep/actions)
+[![Go Reference](https://pkg.go.dev/badge/github.com/micromdm/scep.svg)](https://pkg.go.dev/github.com/micromdm/scep)
 
 `scep` is a Simple Certificate Enrollment Protocol server and client
 
-# Installation
-A binary release is available on the releases page.
+## Installation
 
-## Compiling
-To compile the SCEP client and server, there are a few requirements.
-* You must have a Go compiler. The compiler is normally in the `golang` package.
-* You must have a shell variable set for $GOPATH. This is a directory used by the Go compiler and utilities for all Go projects.
+Binary releases are available on the [releases page](https://github.com/micromdm/scep/releases).
 
-1. Once all of those are set, clone the repository with `go get github.com/micromdm/scep`
-2. Install dependencies:
-    `make deps`
-3. Compile the server and client binaries: 
-    `make build`
-The binaries will be compiled in the `build/` folder.
+### Compiling from source
 
-# Example
+To compile the SCEP client and server you will need [a Go compiler](https://golang.org/dl/) as well as standard tools like git, make, etc.
+
+1. Clone the repository and get into the source directory: `go get github.com/micromdm/scep && cd src/github.com/micromdm/scep`
+2. Compile the client and server binaries: `make`
+
+The binaries will be compiled in the current directory and named after the architecture. I.e. `scepclient-linux-amd64` and `scepserver-linux-amd64`.
+
+### Docker
+
+See Docker documentation below.
+
+## Example setup
+
 Minimal example for both server and client.
 
 ```
+# SERVER:
 # create a new CA
-scepserver ca -init
+./scepserver-linux-amd64 ca -init
 # start server
-scepserver -depot depot -port 2016 -challenge=secret
+./scepserver-linux-amd64 -depot depot -port 2016 -challenge=secret
 
 # SCEP request:
 # in a separate terminal window, run a client
 # note, if the client.key doesn't exist, the client will create a new rsa private key. Must be in PEM format.
-scepclient -private-key client.key -server-url=http://scep.groob.io:2016/scep -challenge=secret
+./scepclient-linux-amd64 -private-key client.key -server-url=http://127.0.0.1:2016/scep -challenge=secret
 
 # NDES request:
 # note, this should point to an NDES server, scepserver does not provide NDES.
-scepclient -private-key client.key -server-url=https://scep.example.com:4321/certsrv/mscep/ -ca-fingerprint="81C827D2 3DAAF3B4 73999632 67609B30"
+./scepclient-linux-amd64 -private-key client.key -server-url=https://scep.example.com:4321/certsrv/mscep/ -ca-fingerprint="81C827D2 3DAAF3B4 73999632 67609B30"
 ```
 
-# Server Usage
+## Server Usage
 
-The default flags configure and run the scep server.  
-depot must be the path to a folder with `ca.pem` and `ca.key` files. 
+The default flags configure and run the scep server.
 
-If you don't already have a CA to use, you can create one using the `scep ca` subcommand.
+`-depot` must be the path to a folder with `ca.pem` and `ca.key` files.  If you don't already have a CA to use, you can create one using the `ca` subcommand.
 
-The scepserver currently provides one HTTP endpoint `/scep`.
+The scepserver provides one HTTP endpoint, `/scep`, that facilitates the normal PKIOperation/Message parameters.
 
-```
-Usage of ./cmd/scepserver/scepserver:
+Server usage:
+```sh
+$ ./scepserver-linux-amd64 -help
   -allowrenew string
     	do not allow renewal until n days before expiry, set to 0 to always allow (default "14")
   -capass string
@@ -68,12 +74,17 @@ Usage of ./cmd/scepserver/scepserver:
     	port to listen on (default "8080")
   -version
     	prints version information
+usage: scep [<command>] [<args>]
+ ca <args> create/manage a CA
+type <command> --help to see usage for each subcommand
 ```
 
-`scep ca -init` to create a new CA and private key. 
+Use the `ca -init` subcommand to create a new CA and private key. 
 
+CA sub-command usage:
 ```
-Usage of ./cmd/scepserver/scepserver ca:
+$ ./scepserver-linux-amd64 ca -help
+Usage of ca:
   -country string
     	country for CA cert (default "US")
   -depot string
@@ -86,14 +97,27 @@ Usage of ./cmd/scepserver/scepserver ca:
     	rsa key size (default 4096)
   -organization string
     	organization for CA cert (default "scep-ca")
+  -organizational_unit string
+    	organizational unit (OU) for CA cert (default "SCEP CA")
   -years int
     	default CA years (default 10)
 ```
 
-# Client Usage
+### CSR verifier
 
+The `-csrverifierexec` switch to the SCEP server allows for executing a command before a certificate is issued to verify the submitted CSR. Scripts exiting without errors (zero exit status) will proceed to certificate issuance, otherwise a SCEP error is generated to the client. For example if you wanted to just save the CSR this is a valid CSR verifier shell script:
+
+```sh
+#!/bin/sh
+
+cat - > /tmp/scep.csr
 ```
-Usage of scepclient:
+
+## Client Usage
+
+```sh
+$ ./scepclient-linux-amd64 -help
+Usage of ./scepclient-linux-amd64:
   -ca-fingerprint string
     	md5 fingerprint of CA certificate for NDES server.
   -certificate string
@@ -129,10 +153,15 @@ Usage of scepclient:
 Note: Make sure to specify the desired endpoint in your `-server-url` value (e.g. `'http://scep.groob.io:2016/scep'`)
 
 To obtain a certificate through Network Device Enrollment Service (NDES), set `-server-url` to a server that provides NDES.
-This most likely uses the `/certsrv/mscep` path instead. You will need to add the `-ca-fingerprint` client argument during this request.
+This most likely uses the `/certsrv/mscep` path. You will need to add the `-ca-fingerprint` client argument during this request to specify which CA to use.
 
-# Docker
-```
+## Docker
+
+```sh
+# first compile the Docker binaries
+make docker
+
+# build the image
 docker build -t micromdm/scep:latest .
 
 # create CA
@@ -142,16 +171,19 @@ docker run -it --rm -v /path/to/ca/folder:/depot micromdm/scep:latest ca -init
 docker run -it --rm -v /path/to/ca/folder:/depot -p 8080:8080 micromdm/scep:latest
 ```
 
-# SCEP library
+## SCEP library
+
+The core `scep` library can be used for both client and server operations.
 
 ```
 go get github.com/micromdm/scep/scep
 ```
 
-For detailed usage, see [godoc](https://godoc.org/github.com/micromdm/scep/scep) 
+For detailed usage, see the [Go Reference](https://pkg.go.dev/github.com/micromdm/scep/scep).
 
-Example:
-```
+Example (server):
+
+```go
 // read a request body containing SCEP message
 body, err := ioutil.ReadAll(r.Body)
 if err != nil {
@@ -173,24 +205,15 @@ if err != nil {
     // handle err
 }
 
-// use the csr from decrypted PKCRS request
-csr := msg.CSRReqMessage.CSR
-
-// create cert template
-tmpl := &x509.Certificate{
-	SerialNumber: big.NewInt(1),
-	Subject:      csr.Subject,
-	NotBefore:    time.Now().Add(-600).UTC(),
-	NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
-	SubjectKeyId: id,
-	ExtKeyUsage: []x509.ExtKeyUsage{
-		x509.ExtKeyUsageAny,
-		x509.ExtKeyUsageClientAuth,
-	},
+// use the CSR from decrypted PKCS request and sign
+// MyCSRSigner returns an *x509.Certificate here
+crt, err := MyCSRSigner(msg.CSRReqMessage.CSR)
+if err != nil {
+    // handle err
 }
 
 // create a CertRep message from the original
-certRep, err := msg.SignCSR(CAcert, CAkey, tmlp)
+certRep, err := msg.Success(CAcert, CAkey, crt)
 if err != nil {
     // handle err
 }
@@ -200,6 +223,8 @@ if err != nil {
 w.Write(certRep.Raw)
 ```
 
-# Server library
+## Server library
 
-You can import the scep endpoint into another Go project. For an example take a look at `cmd/scep/main.go`
+You can import the scep endpoint into another Go project. For an example take a look at [scepserver.go](cmd/scepserver/scepserver.go).
+
+The SCEP server includes a built-in CA/certificate store. This is facilitated by the `Depot` and `CSRSigner` Go interfaces. This certificate storage to happen however you want. It also allows for swapping out the entire CA signer altogether or even using SCEP as a proxy for certificates.
