@@ -1,4 +1,4 @@
-FROM alpine:3.6
+FROM alpine:3
 
 COPY ./scepclient-linux-amd64 /usr/bin/scepclient
 COPY ./scepserver-linux-amd64 /usr/bin/scepserver
