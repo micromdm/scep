@@ -45,6 +45,7 @@ type runCfg struct {
 	debug        bool
 	logfmt       string
 	caCertMsg    string
+	dumpCA       bool
 }
 
 func run(cfg runCfg) error {
@@ -124,6 +125,10 @@ func run(cfg runCfg) error {
 				return err
 			}
 		}
+	}
+
+	if cfg.dumpCA {
+		dumpCerts(lginfo, certs)
 	}
 
 	var signerCert *x509.Certificate
@@ -221,9 +226,22 @@ func run(cfg runCfg) error {
 	return nil
 }
 
+// log our certs and their hashes
+func dumpCerts(logger log.Logger, certs []*x509.Certificate) {
+	for i, cert := range certs {
+		h := sha256.New()
+		h.Write(cert.Raw)
+		logger.Log(
+			"msg", "dumpca",
+			"idx", i,
+			"rdns", cert.Subject.ToRDNSequence().String(),
+			"sha256", fmt.Sprintf("%x", h.Sum(nil)),
+		)
+	}
+}
+
 // Determine the correct recipient based on the fingerprint.
 // In case of NDES that is the last certificate in the chain, not the RA cert.
-// Note: this function assumes that the input certs are sorted as a valid chain.
 // Return a full chain starting with the cert that matches the fingerprint.
 func findRecipients(fingerprint string, certs []*x509.Certificate) ([]*x509.Certificate, error) {
 	fingerprint = strings.Join(strings.Split(fingerprint, " "), "")
@@ -266,6 +284,7 @@ func main() {
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
 		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
+		flDumpCA            = flag.Bool("dumpca", false, "prints CAs returned")
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
@@ -317,6 +336,7 @@ func main() {
 		debug:        *flDebugLogging,
 		logfmt:       logfmt,
 		caCertMsg:    *flCACertMessage,
+		dumpCA:       *flDumpCA,
 	}
 
 	if err := run(cfg); err != nil {
