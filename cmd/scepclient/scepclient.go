@@ -27,24 +27,24 @@ var (
 )
 
 type runCfg struct {
-	dir          string
-	csrPath      string
-	keyPath      string
-	keyBits      int
-	selfSignPath string
-	certPath     string
-	cn           string
-	org          string
-	ou           string
-	locality     string
-	province     string
-	country      string
-	challenge    string
-	serverURL    string
-	caSHA256     string
-	debug        bool
-	logfmt       string
-	caCertMsg    string
+	dir            string
+	csrPath        string
+	keyPath        string
+	keyBits        int
+	selfSignPath   string
+	certPath       string
+	cn             string
+	org            string
+	ou             string
+	locality       string
+	province       string
+	country        string
+	challenge      string
+	serverURL      string
+	caCertSelector scep.CertsSelector
+	debug          bool
+	logfmt         string
+	caCertMsg      string
 }
 
 func run(cfg runCfg) error {
@@ -130,6 +130,16 @@ func run(cfg runCfg) error {
 		logCerts(level.Debug(logger), certs)
 	}
 
+	// pick the CA/RA cert based on our CertSelector
+	recipients := cfg.caCertSelector.SelectCerts(certs)
+	if len(recipients) < 1 {
+		if len(certs) >= 1 {
+			// provide a more useful error if we think the CertSelector (fingerprint) returned nothing
+			return errors.New("no selected CA/RA certificates found (check fingerprint?)")
+		}
+		return errors.New("no CA/RA certificates found")
+	}
+
 	var signerCert *x509.Certificate
 	{
 		if cert != nil {
@@ -147,17 +157,6 @@ func run(cfg runCfg) error {
 		} else {
 			msgType = scep.PKCSReq
 		}
-	}
-
-	var recipients []*x509.Certificate
-	if cfg.caSHA256 == "" {
-		recipients = certs
-	} else {
-		r, err := findRecipients(cfg.caSHA256, certs)
-		if err != nil {
-			return err
-		}
-		recipients = r
 	}
 
 	tmpl := &scep.PKIMessage{
@@ -238,19 +237,20 @@ func logCerts(logger log.Logger, certs []*x509.Certificate) {
 	}
 }
 
-// Determine the correct recipient based on the fingerprint.
-// In case of NDES that is the last certificate in the chain, not the RA cert.
-// Return a full chain starting with the cert that matches the fingerprint.
-func findRecipients(fingerprint string, certs []*x509.Certificate) ([]*x509.Certificate, error) {
+// sha256FingerprintCertsSelector returns a CertsSelector that matches a SHA-256 fingerprint
+func sha256FingerprintCertsSelector(fingerprint string) scep.CertsSelectorFunc {
 	fingerprint = strings.Join(strings.Split(fingerprint, " "), "")
 	fingerprint = strings.ToLower(fingerprint)
-	for i, cert := range certs {
-		sum := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
-		if sum == fingerprint {
-			return certs[i-1:], nil
+	return func(certs []*x509.Certificate) (selected []*x509.Certificate) {
+		for _, cert := range certs {
+			sum := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
+			if sum == fingerprint {
+				selected = append(selected, cert)
+				return
+			}
 		}
+		return
 	}
-	return nil, errors.Errorf("could not find cert for sha256 fingerprint: %s", fingerprint)
 }
 
 func validateFlags(keyPath, serverURL string) error {
@@ -315,24 +315,28 @@ func main() {
 	}
 
 	cfg := runCfg{
-		dir:          dir,
-		csrPath:      csrPath,
-		keyPath:      *flPKeyPath,
-		keyBits:      *flKeySize,
-		selfSignPath: selfSignPath,
-		certPath:     *flCertPath,
-		cn:           *flCName,
-		org:          *flOrg,
-		country:      *flCountry,
-		locality:     *flLoc,
-		ou:           *flOU,
-		province:     *flProvince,
-		challenge:    *flChallengePassword,
-		serverURL:    *flServerURL,
-		caSHA256:     *flCAFingerprint,
-		debug:        *flDebugLogging,
-		logfmt:       logfmt,
-		caCertMsg:    *flCACertMessage,
+		dir:            dir,
+		csrPath:        csrPath,
+		keyPath:        *flPKeyPath,
+		keyBits:        *flKeySize,
+		selfSignPath:   selfSignPath,
+		certPath:       *flCertPath,
+		cn:             *flCName,
+		org:            *flOrg,
+		country:        *flCountry,
+		locality:       *flLoc,
+		ou:             *flOU,
+		province:       *flProvince,
+		challenge:      *flChallengePassword,
+		serverURL:      *flServerURL,
+		caCertSelector: scep.NopCertsSelector(),
+		debug:          *flDebugLogging,
+		logfmt:         logfmt,
+		caCertMsg:      *flCACertMessage,
+	}
+
+	if *flCAFingerprint != "" {
+		cfg.caCertSelector = sha256FingerprintCertsSelector(*flCAFingerprint)
 	}
 
 	if err := run(cfg); err != nil {
