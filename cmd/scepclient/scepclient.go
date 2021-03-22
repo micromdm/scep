@@ -45,7 +45,6 @@ type runCfg struct {
 	debug        bool
 	logfmt       string
 	caCertMsg    string
-	dumpCA       bool
 }
 
 func run(cfg runCfg) error {
@@ -127,8 +126,8 @@ func run(cfg runCfg) error {
 		}
 	}
 
-	if cfg.dumpCA {
-		dumpCerts(lginfo, certs)
+	if cfg.debug {
+		debugCerts(logger, certs)
 	}
 
 	var signerCert *x509.Certificate
@@ -226,15 +225,17 @@ func run(cfg runCfg) error {
 	return nil
 }
 
-// log our certs and their hashes
-func dumpCerts(logger log.Logger, certs []*x509.Certificate) {
+// debugCerts logs certs and their hashes
+func debugCerts(logger log.Logger, certs []*x509.Certificate) {
+	lgdebug := level.Debug(logger)
+	lgdebug.Log("msg", "certs", "count", len(certs))
 	for i, cert := range certs {
 		h := sha256.New()
 		h.Write(cert.Raw)
-		logger.Log(
-			"msg", "dumpca",
-			"idx", i,
-			"rdns", cert.Subject.ToRDNSequence().String(),
+		lgdebug.Log(
+			"msg", "certs",
+			"number", i,
+			"rdn", cert.Subject.ToRDNSequence().String(),
 			"sha256", fmt.Sprintf("%x", h.Sum(nil)),
 		)
 	}
@@ -284,7 +285,6 @@ func main() {
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
 		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
-		flDumpCA            = flag.Bool("dumpca", false, "prints CAs returned")
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
@@ -336,7 +336,6 @@ func main() {
 		debug:        *flDebugLogging,
 		logfmt:       logfmt,
 		caCertMsg:    *flCACertMessage,
-		dumpCA:       *flDumpCA,
 	}
 
 	if err := run(cfg); err != nil {
