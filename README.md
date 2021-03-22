@@ -119,7 +119,7 @@ cat - > /tmp/scep.csr
 $ ./scepclient-linux-amd64 -help
 Usage of ./scepclient-linux-amd64:
   -ca-fingerprint string
-    	(Note: Changed from MD5) SHA-256 digest of CA certificate for NDES server.
+    	SHA-256 digest of CA certificate for NDES server. Note: Changed from MD5.
   -certificate string
     	certificate path, if there is no key, scepclient will create one
   -challenge string

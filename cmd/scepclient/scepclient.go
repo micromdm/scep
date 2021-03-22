@@ -269,7 +269,7 @@ func main() {
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
-		flCAFingerprint = flag.String("ca-fingerprint", "", "(Note: Changed from MD5) SHA-256 digest of CA certificate for NDES server.")
+		flCAFingerprint = flag.String("ca-fingerprint", "", "SHA-256 digest of CA certificate for NDES server. Note: Changed from MD5.")
 
 		flDebugLogging = flag.Bool("debug", false, "enable debug logging")
 		flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
