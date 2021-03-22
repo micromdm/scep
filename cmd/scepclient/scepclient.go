@@ -115,9 +115,6 @@ func run(cfg runCfg) error {
 			if err != nil {
 				return err
 			}
-			if len(certs) < 1 {
-				return fmt.Errorf("no certificates returned")
-			}
 		} else {
 			certs, err = x509.ParseCertificates(resp)
 			if err != nil {
@@ -133,10 +130,6 @@ func run(cfg runCfg) error {
 	// pick the CA/RA cert based on our CertSelector
 	recipients := cfg.caCertSelector.SelectCerts(certs)
 	if len(recipients) < 1 {
-		if len(certs) >= 1 {
-			// provide a more useful error if we think the CertSelector (fingerprint) returned nothing
-			return errors.New("no selected CA/RA certificates found (check fingerprint?)")
-		}
 		return errors.New("no CA/RA certificates found")
 	}
 
