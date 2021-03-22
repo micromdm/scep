@@ -229,13 +229,11 @@ func run(cfg runCfg) error {
 func debugCerts(logger log.Logger, certs []*x509.Certificate) {
 	logger.Log("msg", "cacertlist", "count", len(certs))
 	for i, cert := range certs {
-		h := sha256.New()
-		h.Write(cert.Raw)
 		logger.Log(
 			"msg", "cacertlist",
 			"number", i,
 			"rdn", cert.Subject.ToRDNSequence().String(),
-			"sha256", fmt.Sprintf("%x", h.Sum(nil)),
+			"sha256", fmt.Sprintf("%x", sha256.Sum256(cert.Raw)),
 		)
 	}
 }
