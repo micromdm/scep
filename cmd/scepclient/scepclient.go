@@ -149,11 +149,11 @@ func run(cfg runCfg) error {
 	if cfg.caSHA256 == "" {
 		recipients = certs
 	} else {
-		r, err := findRecipients(cfg.caSHA256, certs)
+		r, err := findCertWithSHA256Fingerprint(cfg.caSHA256, certs)
 		if err != nil {
 			return err
 		}
-		recipients = r
+		recipients = []*x509.Certificate{r}
 	}
 
 	tmpl := &scep.PKIMessage{
@@ -221,20 +221,17 @@ func run(cfg runCfg) error {
 	return nil
 }
 
-// Determine the correct recipient based on the fingerprint.
-// In case of NDES that is the last certificate in the chain, not the RA cert.
-// Note: this function assumes that the input certs are sorted as a valid chain.
-// Return a full chain starting with the cert that matches the fingerprint.
-func findRecipients(fingerprint string, certs []*x509.Certificate) ([]*x509.Certificate, error) {
-	fingerprint = strings.Join(strings.Split(fingerprint, " "), "")
-	fingerprint = strings.ToLower(fingerprint)
+// Returns the certificate with the specified SHA-256 fingerprint.
+func findCertWithSHA256Fingerprint(sha256fingerprint string, certs []*x509.Certificate) (*x509.Certificate, error) {
+	sha256fingerprint = strings.Join(strings.Split(sha256fingerprint, " "), "")
+	sha256fingerprint = strings.ToLower(sha256fingerprint)
 	for i, cert := range certs {
 		sum := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
-		if sum == fingerprint {
-			return certs[i-1:], nil
+		if sum == sha256fingerprint {
+			return certs[i], nil
 		}
 	}
-	return nil, errors.Errorf("could not find cert for sha256 fingerprint: %s", fingerprint)
+	return nil, errors.Errorf("could not find cert for sha256 fingerprint: %s", sha256fingerprint)
 }
 
 func validateFlags(keyPath, serverURL string) error {
