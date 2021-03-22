@@ -27,24 +27,24 @@ var (
 )
 
 type runCfg struct {
-	dir            string
-	csrPath        string
-	keyPath        string
-	keyBits        int
-	selfSignPath   string
-	certPath       string
-	cn             string
-	org            string
-	ou             string
-	locality       string
-	province       string
-	country        string
-	challenge      string
-	serverURL      string
-	caCertSelector scep.CertsSelector
-	debug          bool
-	logfmt         string
-	caCertMsg      string
+	dir             string
+	csrPath         string
+	keyPath         string
+	keyBits         int
+	selfSignPath    string
+	certPath        string
+	cn              string
+	org             string
+	ou              string
+	locality        string
+	province        string
+	country         string
+	challenge       string
+	serverURL       string
+	caCertsSelector scep.CertsSelector
+	debug           bool
+	logfmt          string
+	caCertMsg       string
 }
 
 func run(cfg runCfg) error {
@@ -127,8 +127,8 @@ func run(cfg runCfg) error {
 		logCerts(level.Debug(logger), certs)
 	}
 
-	// pick the CA/RA cert based on our CertSelector
-	recipients := cfg.caCertSelector.SelectCerts(certs)
+	// pick the CA/RA cert using our CertsSelector
+	recipients := cfg.caCertsSelector.SelectCerts(certs)
 	if len(recipients) < 1 {
 		return errors.New("no CA/RA certificates found")
 	}
@@ -308,28 +308,28 @@ func main() {
 	}
 
 	cfg := runCfg{
-		dir:            dir,
-		csrPath:        csrPath,
-		keyPath:        *flPKeyPath,
-		keyBits:        *flKeySize,
-		selfSignPath:   selfSignPath,
-		certPath:       *flCertPath,
-		cn:             *flCName,
-		org:            *flOrg,
-		country:        *flCountry,
-		locality:       *flLoc,
-		ou:             *flOU,
-		province:       *flProvince,
-		challenge:      *flChallengePassword,
-		serverURL:      *flServerURL,
-		caCertSelector: scep.NopCertsSelector(),
-		debug:          *flDebugLogging,
-		logfmt:         logfmt,
-		caCertMsg:      *flCACertMessage,
+		dir:             dir,
+		csrPath:         csrPath,
+		keyPath:         *flPKeyPath,
+		keyBits:         *flKeySize,
+		selfSignPath:    selfSignPath,
+		certPath:        *flCertPath,
+		cn:              *flCName,
+		org:             *flOrg,
+		country:         *flCountry,
+		locality:        *flLoc,
+		ou:              *flOU,
+		province:        *flProvince,
+		challenge:       *flChallengePassword,
+		serverURL:       *flServerURL,
+		caCertsSelector: scep.NopCertsSelector(),
+		debug:           *flDebugLogging,
+		logfmt:          logfmt,
+		caCertMsg:       *flCACertMessage,
 	}
 
 	if *flCAFingerprint != "" {
-		cfg.caCertSelector = sha256FingerprintCertsSelector(*flCAFingerprint)
+		cfg.caCertsSelector = sha256FingerprintCertsSelector(*flCAFingerprint)
 	}
 
 	if err := run(cfg); err != nil {
