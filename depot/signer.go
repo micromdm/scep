@@ -2,7 +2,9 @@ package depot
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
+	"fmt"
 	"time"
 
 	"github.com/micromdm/scep/cryptoutil"
@@ -120,5 +122,5 @@ func certName(crt *x509.Certificate) string {
 	if crt.Subject.CommonName != "" {
 		return crt.Subject.CommonName
 	}
-	return string(crt.Signature)
+	return fmt.Sprintf("%x", sha256.Sum256(crt.Raw))
 }
