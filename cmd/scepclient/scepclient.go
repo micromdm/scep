@@ -127,7 +127,7 @@ func run(cfg runCfg) error {
 	}
 
 	if cfg.debug {
-		debugCerts(level.Debug(logger), certs)
+		logCerts(level.Debug(logger), certs)
 	}
 
 	var signerCert *x509.Certificate
@@ -225,8 +225,8 @@ func run(cfg runCfg) error {
 	return nil
 }
 
-// debugCerts logs certs and their hashes
-func debugCerts(logger log.Logger, certs []*x509.Certificate) {
+// logCerts logs the count, number, RDN, and SHA-256 of certs to logger
+func logCerts(logger log.Logger, certs []*x509.Certificate) {
 	logger.Log("msg", "cacertlist", "count", len(certs))
 	for i, cert := range certs {
 		logger.Log(
