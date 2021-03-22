@@ -127,7 +127,7 @@ func run(cfg runCfg) error {
 	}
 
 	if cfg.debug {
-		debugCerts(logger, certs)
+		debugCerts(level.Debug(logger), certs)
 	}
 
 	var signerCert *x509.Certificate
@@ -227,13 +227,12 @@ func run(cfg runCfg) error {
 
 // debugCerts logs certs and their hashes
 func debugCerts(logger log.Logger, certs []*x509.Certificate) {
-	lgdebug := level.Debug(logger)
-	lgdebug.Log("msg", "certs", "count", len(certs))
+	logger.Log("msg", "cacertlist", "count", len(certs))
 	for i, cert := range certs {
 		h := sha256.New()
 		h.Write(cert.Raw)
-		lgdebug.Log(
-			"msg", "certs",
+		logger.Log(
+			"msg", "cacertlist",
 			"number", i,
 			"rdn", cert.Subject.ToRDNSequence().String(),
 			"sha256", fmt.Sprintf("%x", h.Sum(nil)),
