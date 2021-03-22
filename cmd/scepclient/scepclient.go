@@ -126,6 +126,10 @@ func run(cfg runCfg) error {
 		}
 	}
 
+	if cfg.debug {
+		logCerts(level.Debug(logger), certs)
+	}
+
 	var signerCert *x509.Certificate
 	{
 		if cert != nil {
@@ -221,9 +225,21 @@ func run(cfg runCfg) error {
 	return nil
 }
 
+// logCerts logs the count, number, RDN, and SHA-256 of certs to logger
+func logCerts(logger log.Logger, certs []*x509.Certificate) {
+	logger.Log("msg", "cacertlist", "count", len(certs))
+	for i, cert := range certs {
+		logger.Log(
+			"msg", "cacertlist",
+			"number", i,
+			"rdn", cert.Subject.ToRDNSequence().String(),
+			"sha256", fmt.Sprintf("%x", sha256.Sum256(cert.Raw)),
+		)
+	}
+}
+
 // Determine the correct recipient based on the fingerprint.
 // In case of NDES that is the last certificate in the chain, not the RA cert.
-// Note: this function assumes that the input certs are sorted as a valid chain.
 // Return a full chain starting with the cert that matches the fingerprint.
 func findRecipients(fingerprint string, certs []*x509.Certificate) ([]*x509.Certificate, error) {
 	fingerprint = strings.Join(strings.Split(fingerprint, " "), "")
