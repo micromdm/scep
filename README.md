@@ -40,7 +40,7 @@ Minimal example for both server and client.
 
 # NDES request:
 # note, this should point to an NDES server, scepserver does not provide NDES.
-./scepclient-linux-amd64 -private-key client.key -server-url=https://scep.example.com:4321/certsrv/mscep/ -ca-fingerprint="81C827D2 3DAAF3B4 73999632 67609B30"
+./scepclient-linux-amd64 -private-key client.key -server-url=https://scep.example.com:4321/certsrv/mscep/ -ca-fingerprint="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 ```
 
 ## Server Usage
@@ -154,6 +154,8 @@ Note: Make sure to specify the desired endpoint in your `-server-url` value (e.g
 
 To obtain a certificate through Network Device Enrollment Service (NDES), set `-server-url` to a server that provides NDES.
 This most likely uses the `/certsrv/mscep` path. You will need to add the `-ca-fingerprint` client argument during this request to specify which CA to use.
+
+If you're not sure which SHA-256 hash (for a specific CA) to use, you can use the `-debug` flag to print them out for the CAs returned from the SCEP server.
 
 ## Docker
 
