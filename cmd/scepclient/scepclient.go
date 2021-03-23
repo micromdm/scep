@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -231,19 +233,36 @@ func logCerts(logger log.Logger, certs []*x509.Certificate) {
 }
 
 // sha256FingerprintCertsSelector returns a CertsSelector that matches a SHA-256 fingerprint
-func sha256FingerprintCertsSelector(fingerprint string) scep.CertsSelectorFunc {
-	fingerprint = strings.Join(strings.Split(fingerprint, " "), "")
-	fingerprint = strings.ToLower(fingerprint)
+func sha256FingerprintCertsSelector(hash []byte) scep.CertsSelectorFunc {
 	return func(certs []*x509.Certificate) (selected []*x509.Certificate) {
 		for _, cert := range certs {
-			sum := fmt.Sprintf("%x", sha256.Sum256(cert.Raw))
-			if sum == fingerprint {
+			sum := sha256.Sum256(cert.Raw)
+			if bytes.Compare(sum[:], hash) == 0 {
 				selected = append(selected, cert)
 				return
 			}
 		}
 		return
 	}
+}
+
+// validateSHA256Fingerprint makes sure fingerprint looks like a SHA-256 hash.
+// We take out spaces and colons from fingerprint as it may come in various forms:
+//     e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+//     E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855
+//     e3b0c442 98fc1c14 9afbf4c8 996fb924 27ae41e4 649b934c a495991b 7852b855
+//     e3:b0:c4:42:98:fc:1c:14:9a:fb:f4:c8:99:6f:b9:24:27:ae:41:e4:64:9b:93:4c:a4:95:99:1b:78:52:b8:55
+func validateSHA256Fingerprint(fingerprint string) (bytes []byte, err error) {
+	fingerprint = strings.NewReplacer(" ", "", ":", "").Replace(fingerprint)
+	bytes, err = hex.DecodeString(fingerprint)
+	if err != nil {
+		return
+	}
+	// check for length of SHA-256
+	if len(bytes) != 32 {
+		err = errors.New("invalid SHA-256 hash length")
+	}
+	return
 }
 
 func validateFlags(keyPath, serverURL string) error {
@@ -296,6 +315,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	caCertsSelector := scep.NopCertsSelector()
+	if *flCAFingerprint != "" {
+		hashBytes, err := validateSHA256Fingerprint(*flCAFingerprint)
+		if err != nil {
+			fmt.Println(fmt.Errorf("invalid fingerprint: %v", err))
+			os.Exit(1)
+		}
+		caCertsSelector = sha256FingerprintCertsSelector(hashBytes)
+	}
+
 	dir := filepath.Dir(*flPKeyPath)
 	csrPath := dir + "/csr.pem"
 	selfSignPath := dir + "/self.pem"
@@ -322,14 +351,10 @@ func main() {
 		province:        *flProvince,
 		challenge:       *flChallengePassword,
 		serverURL:       *flServerURL,
-		caCertsSelector: scep.NopCertsSelector(),
+		caCertsSelector: caCertsSelector,
 		debug:           *flDebugLogging,
 		logfmt:          logfmt,
 		caCertMsg:       *flCACertMessage,
-	}
-
-	if *flCAFingerprint != "" {
-		cfg.caCertsSelector = sha256FingerprintCertsSelector(*flCAFingerprint)
 	}
 
 	if err := run(cfg); err != nil {
