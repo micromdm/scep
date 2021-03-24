@@ -566,7 +566,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	derBytes := csr.Raw
 	recipients := conf.certsSelector.SelectCerts(tmpl.Recipients)
 	if len(recipients) == 0 {
-		return nil, errors.New("no recipients that can be used for KeyEncipherment.")
+		return nil, errors.New("no CA/RA recipients")
 	}
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
@@ -633,6 +633,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 		TransactionID: tID,
 		SenderNonce:   sn,
 		CSRReqMessage: cr,
+		Recipients:    recipients,
 		logger:        conf.logger,
 	}
 
