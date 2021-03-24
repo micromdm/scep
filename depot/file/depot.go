@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -79,18 +80,25 @@ func (d *fileDepot) Put(cn string, crt *x509.Certificate) error {
 		return err
 	}
 
-	name := d.path(cn) + "." + serial.String() + ".pem"
-	file, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, certPerm)
+	if crt.Subject.CommonName == "" {
+		// this means our cn was replaced by the certificate Signature
+		// which is inappropriate for a filename
+		cn = fmt.Sprintf("%x", sha256.Sum256(crt.Raw))
+	}
+	filename := fmt.Sprintf("%s.%s.pem", cn, serial.String())
+
+	filepath := d.path(filename)
+	file, err := os.OpenFile(filepath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, certPerm)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
 	if _, err := file.Write(pemCert(data)); err != nil {
-		os.Remove(name)
+		os.Remove(filepath)
 		return err
 	}
-	if err := d.writeDB(cn, serial, cn+"."+serial.String()+".pem", crt); err != nil {
+	if err := d.writeDB(cn, serial, filename, crt); err != nil {
 		// TODO : remove certificate in case of writeDB problems
 		return err
 	}
@@ -165,7 +173,7 @@ func makeDn(cert *x509.Certificate) string {
 }
 
 // Determine if the cadb already has a valid certificate with the same name
-func (d *fileDepot) HasCN(cn string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) (bool, error) {
+func (d *fileDepot) HasCN(_ string, allowTime int, cert *x509.Certificate, revokeOldCertificate bool) (bool, error) {
 
 	var addDB bytes.Buffer
 	candidates := make(map[string]string)
