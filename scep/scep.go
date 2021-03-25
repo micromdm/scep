@@ -189,7 +189,7 @@ type PKIMessage struct {
 	// decrypted enveloped content
 	pkiEnvelope []byte
 
-	// Used to sign message
+	// Used to encrypt message
 	Recipients []*x509.Certificate
 
 	// Signer info
@@ -565,8 +565,12 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 
 	derBytes := csr.Raw
 	recipients := conf.certsSelector.SelectCerts(tmpl.Recipients)
-	if len(recipients) == 0 {
-		return nil, errors.New("no recipients that can be used for KeyEncipherment.")
+	if len(recipients) < 1 {
+		if len(tmpl.Recipients) >= 1 {
+			// our certsSelector eliminated any CA/RA recipients
+			return nil, errors.New("no selected CA/RA recipients")
+		}
+		return nil, errors.New("no CA/RA recipients")
 	}
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
@@ -633,6 +637,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 		TransactionID: tID,
 		SenderNonce:   sn,
 		CSRReqMessage: cr,
+		Recipients:    recipients,
 		logger:        conf.logger,
 	}
 

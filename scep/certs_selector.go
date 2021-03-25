@@ -1,6 +1,9 @@
 package scep
 
-import "crypto/x509"
+import (
+	"crypto/sha256"
+	"crypto/x509"
+)
 
 // A CertsSelector filters certificates.
 type CertsSelector interface {
@@ -33,5 +36,19 @@ func EnciphermentCertsSelector() CertsSelectorFunc {
 			}
 		}
 		return selected
+	}
+}
+
+// SHA256FingerprintCertsSelector selects a certificate that matches
+// a SHA-256 hash of the raw certificate DER bytes
+func SHA256FingerprintCertsSelector(hash [32]byte) CertsSelectorFunc {
+	return func(certs []*x509.Certificate) (selected []*x509.Certificate) {
+		for _, cert := range certs {
+			if sha256.Sum256(cert.Raw) == hash {
+				selected = append(selected, cert)
+				return
+			}
+		}
+		return
 	}
 }
