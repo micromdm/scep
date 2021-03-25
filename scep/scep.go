@@ -189,7 +189,7 @@ type PKIMessage struct {
 	// decrypted enveloped content
 	pkiEnvelope []byte
 
-	// Used to sign message
+	// Used to encrypt message
 	Recipients []*x509.Certificate
 
 	// Signer info
