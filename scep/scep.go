@@ -565,7 +565,11 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 
 	derBytes := csr.Raw
 	recipients := conf.certsSelector.SelectCerts(tmpl.Recipients)
-	if len(recipients) == 0 {
+	if len(recipients) < 1 {
+		if len(tmpl.Recipients) >= 1 {
+			// our certsSelector eliminated any CA/RA recipients
+			return nil, errors.New("no selected CA/RA recipients")
+		}
 		return nil, errors.New("no CA/RA recipients")
 	}
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
