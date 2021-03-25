@@ -3,7 +3,7 @@ package scepserver
 import (
 	"testing"
 
-	"github.com/micromdm/scep/scep"
+	"github.com/micromdm/scep/v2/scep"
 )
 
 func TestChallengeMiddleware(t *testing.T) {

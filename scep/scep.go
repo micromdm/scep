@@ -12,13 +12,13 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 
+	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/micromdm/scep/v2/cryptoutil/x509util"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/micromdm/scep/cryptoutil"
 	"github.com/pkg/errors"
 	"go.mozilla.org/pkcs7"
-
-	"github.com/micromdm/scep/cryptoutil/x509util"
 )
 
 // errors

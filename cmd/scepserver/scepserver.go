@@ -17,14 +17,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/micromdm/scep/v2/csrverifier"
+	executablecsrverifier "github.com/micromdm/scep/v2/csrverifier/executable"
+	scepdepot "github.com/micromdm/scep/v2/depot"
+	"github.com/micromdm/scep/v2/depot/file"
+	scepserver "github.com/micromdm/scep/v2/server"
+
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-	"github.com/micromdm/scep/cryptoutil"
-	"github.com/micromdm/scep/csrverifier"
-	executablecsrverifier "github.com/micromdm/scep/csrverifier/executable"
-	scepdepot "github.com/micromdm/scep/depot"
-	"github.com/micromdm/scep/depot/file"
-	scepserver "github.com/micromdm/scep/server"
 )
 
 // version info

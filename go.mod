@@ -1,4 +1,4 @@
-module github.com/micromdm/scep
+module github.com/micromdm/scep/v2
 
 go 1.16
 

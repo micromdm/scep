@@ -14,12 +14,13 @@ import (
 	"testing"
 	"time"
 
+	challengestore "github.com/micromdm/scep/v2/challenge/bolt"
+	scepdepot "github.com/micromdm/scep/v2/depot"
+	boltdepot "github.com/micromdm/scep/v2/depot/bolt"
+	"github.com/micromdm/scep/v2/scep"
+	scepserver "github.com/micromdm/scep/v2/server"
+
 	"github.com/boltdb/bolt"
-	challengestore "github.com/micromdm/scep/challenge/bolt"
-	scepdepot "github.com/micromdm/scep/depot"
-	boltdepot "github.com/micromdm/scep/depot/bolt"
-	"github.com/micromdm/scep/scep"
-	scepserver "github.com/micromdm/scep/server"
 )
 
 func TestCaCert(t *testing.T) {

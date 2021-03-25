@@ -11,8 +11,9 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/micromdm/scep/v2/cryptoutil"
+
 	"github.com/boltdb/bolt"
-	"github.com/micromdm/scep/cryptoutil"
 )
 
 // Depot implements a SCEP certifiacte store using boltdb.
