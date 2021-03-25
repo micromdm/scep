@@ -1,7 +1,7 @@
 # scep
 
 [![CI](https://github.com/micromdm/scep/workflows/CI/badge.svg)](https://github.com/micromdm/scep/actions)
-[![Go Reference](https://pkg.go.dev/badge/github.com/micromdm/scep.svg)](https://pkg.go.dev/github.com/micromdm/scep)
+[![Go Reference](https://pkg.go.dev/badge/github.com/micromdm/scep/v2.svg)](https://pkg.go.dev/github.com/micromdm/scep/v2)
 
 `scep` is a Simple Certificate Enrollment Protocol server and client
 
@@ -181,7 +181,7 @@ The core `scep` library can be used for both client and server operations.
 go get github.com/micromdm/scep/scep
 ```
 
-For detailed usage, see the [Go Reference](https://pkg.go.dev/github.com/micromdm/scep/scep).
+For detailed usage, see the [Go Reference](https://pkg.go.dev/github.com/micromdm/scep/v2/scep).
 
 Example (server):
 
