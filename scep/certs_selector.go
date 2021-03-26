@@ -1,7 +1,8 @@
 package scep
 
 import (
-	"crypto/sha256"
+	"bytes"
+	"crypto"
 	"crypto/x509"
 )
 
@@ -39,12 +40,14 @@ func EnciphermentCertsSelector() CertsSelectorFunc {
 	}
 }
 
-// SHA256FingerprintCertsSelector selects a certificate that matches
-// a SHA-256 hash of the raw certificate DER bytes
-func SHA256FingerprintCertsSelector(hash [32]byte) CertsSelectorFunc {
+// FingerprintCertsSelector selects a certificate that matches hash using
+// hashType against the digest of the raw certificate DER bytes
+func FingerprintCertsSelector(hashType crypto.Hash, hash []byte) CertsSelectorFunc {
 	return func(certs []*x509.Certificate) (selected []*x509.Certificate) {
 		for _, cert := range certs {
-			if sha256.Sum256(cert.Raw) == hash {
+			h := hashType.New()
+			h.Write(cert.Raw)
+			if bytes.Compare(hash, h.Sum(nil)) == 0 {
 				selected = append(selected, cert)
 				return
 			}

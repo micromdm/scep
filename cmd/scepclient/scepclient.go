@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
+	"crypto"
+	_ "crypto/sha256"
 	"crypto/x509"
 	"encoding/hex"
 	"flag"
@@ -27,6 +28,8 @@ import (
 var (
 	version = "unknown"
 )
+
+const fingerprintHashType = crypto.SHA256
 
 type runCfg struct {
 	dir             string
@@ -213,35 +216,36 @@ func run(cfg runCfg) error {
 	return nil
 }
 
-// logCerts logs the count, number, RDN, and SHA-256 of certs to logger
+// logCerts logs the count, number, RDN, and fingerprint of certs to logger
 func logCerts(logger log.Logger, certs []*x509.Certificate) {
 	logger.Log("msg", "cacertlist", "count", len(certs))
 	for i, cert := range certs {
+		h := fingerprintHashType.New()
+		h.Write(cert.Raw)
 		logger.Log(
 			"msg", "cacertlist",
 			"number", i,
 			"rdn", cert.Subject.ToRDNSequence().String(),
-			"sha256", fmt.Sprintf("%x", sha256.Sum256(cert.Raw)),
+			"hash_type", fingerprintHashType.String(),
+			"hash", fmt.Sprintf("%x", h.Sum(nil)),
 		)
 	}
 }
 
-// validateSHA256Fingerprint makes sure fingerprint looks like a SHA-256 hash.
+// validateFingerprint makes sure fingerprint looks like a hash.
 // We remove spaces and colons from fingerprint as it may come in various forms:
 //     e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 //     E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855
 //     e3b0c442 98fc1c14 9afbf4c8 996fb924 27ae41e4 649b934c a495991b 7852b855
 //     e3:b0:c4:42:98:fc:1c:14:9a:fb:f4:c8:99:6f:b9:24:27:ae:41:e4:64:9b:93:4c:a4:95:99:1b:78:52:b8:55
-func validateSHA256Fingerprint(fingerprint string) (hash [32]byte, err error) {
+func validateFingerprint(fingerprint string) (hash []byte, err error) {
 	fingerprint = strings.NewReplacer(" ", "", ":", "").Replace(fingerprint)
-	byteSlice, err := hex.DecodeString(fingerprint)
-	copy(hash[:], byteSlice)
+	hash, err = hex.DecodeString(fingerprint)
 	if err != nil {
 		return
 	}
-	// check for length of SHA-256
-	if len(byteSlice) != 32 {
-		err = errors.New("invalid SHA-256 hash length")
+	if len(hash) != fingerprintHashType.Size() {
+		err = fmt.Errorf("invalid %s hash length", fingerprintHashType)
 	}
 	return
 }
@@ -298,12 +302,12 @@ func main() {
 
 	caCertsSelector := scep.NopCertsSelector()
 	if *flCAFingerprint != "" {
-		hash, err := validateSHA256Fingerprint(*flCAFingerprint)
+		hash, err := validateFingerprint(*flCAFingerprint)
 		if err != nil {
-			fmt.Println(fmt.Errorf("invalid fingerprint: %v", err))
+			fmt.Printf("invalid fingerprint: %s\n", err)
 			os.Exit(1)
 		}
-		caCertsSelector = scep.SHA256FingerprintCertsSelector(hash)
+		caCertsSelector = scep.FingerprintCertsSelector(fingerprintHashType, hash)
 	}
 
 	dir := filepath.Dir(*flPKeyPath)
