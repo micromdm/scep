@@ -6,7 +6,7 @@ SCEPCLIENT=\
 	scepclient-linux-amd64 \
 	scepclient-darwin-amd64 \
 	scepclient-freebsd-amd64 \
-	scepclient-windows-amd64.exe \
+	scepclient-windows-amd64.exe
 
 SCEPSERVER=\
 	scepserver-linux-amd64 \
