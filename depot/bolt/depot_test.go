@@ -141,7 +141,7 @@ func TestDepot_CreateOrLoadCA(t *testing.T) {
 			t.Fatalf("%d. Depot.CreateOrLoadKey() error = %v", i, err)
 		}
 
-		if _, err := db.CreateOrLoadCA(key, 10, "MicroMDM", "US"); (err != nil) != tt.wantErr {
+		if _, err := db.CreateOrLoadCA(key, 10, "MicroMDM", "MICROMDM SCEP CA", "US"); (err != nil) != tt.wantErr {
 			t.Errorf("%d. Depot.CreateOrLoadCA() error = %v, wantErr %v", i, err, tt.wantErr)
 		}
 	}

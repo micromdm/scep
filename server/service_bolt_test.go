@@ -27,7 +27,7 @@ func TestDynamicChallenge(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = depot.CreateOrLoadCA(key, 5, "MicroMDM", "US")
+	_, err = depot.CreateOrLoadCA(key, 5, "MicroMDM", "MICROMDM SCEP CA", "US")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -233,7 +233,7 @@ func (db *Depot) CreateOrLoadKey(bits int) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country string) (*x509.Certificate, error) {
+func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, orgUnit, country string) (*x509.Certificate, error) {
 	var (
 		cert *x509.Certificate
 		err  error
@@ -260,7 +260,7 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 	subject := pkix.Name{
 		Country:            []string{country},
 		Organization:       []string{org},
-		OrganizationalUnit: []string{"MICROMDM SCEP CA"},
+		OrganizationalUnit: []string{orgUnit},
 		Locality:           nil,
 		Province:           nil,
 		StreetAddress:      nil,
