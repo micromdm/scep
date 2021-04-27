@@ -5,13 +5,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
-	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/micromdm/scep/v2/depot"
 
 	"github.com/boltdb/bolt"
 )
@@ -266,42 +264,13 @@ func (db *Depot) CreateOrLoadCA(key *rsa.PrivateKey, years int, org, country str
 		return cert, nil
 	}
 
-	subject := pkix.Name{
-		Country:            []string{country},
-		Organization:       []string{org},
-		OrganizationalUnit: []string{"MICROMDM SCEP CA"},
-		Locality:           nil,
-		Province:           nil,
-		StreetAddress:      nil,
-		PostalCode:         nil,
-		SerialNumber:       "",
-		CommonName:         org,
-	}
-
-	subjectKeyID, err := cryptoutil.GenerateSubjectKeyID(&key.PublicKey)
-	if err != nil {
-		return nil, err
-	}
-
-	authTemplate := x509.Certificate{
-		SerialNumber:       big.NewInt(1),
-		Subject:            subject,
-		NotBefore:          time.Now().Add(-600).UTC(),
-		NotAfter:           time.Now().AddDate(years, 0, 0).UTC(),
-		KeyUsage:           x509.KeyUsageCertSign | x509.KeyUsageKeyEncipherment,
-		ExtKeyUsage:        nil,
-		UnknownExtKeyUsage: nil,
-
-		BasicConstraintsValid:       true,
-		IsCA:                        true,
-		MaxPathLen:                  0,
-		SubjectKeyId:                subjectKeyID,
-		DNSNames:                    nil,
-		PermittedDNSDomainsCritical: false,
-		PermittedDNSDomains:         nil,
-	}
-
-	crtBytes, err := x509.CreateCertificate(rand.Reader, &authTemplate, &authTemplate, &key.PublicKey, key)
+	newCert := depot.NewCACert(
+		depot.WithYears(years),
+		depot.WithOrganization(org),
+		depot.WithOrganizationalUnit("MICROMDM SCEP CA"),
+		depot.WithCountry(country),
+	)
+	crtBytes, err := newCert.SelfSign(rand.Reader, &key.PublicKey, key)
 	if err != nil {
 		return nil, err
 	}
