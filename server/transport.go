@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"string"
+	"strings"
 
 	kitlog "github.com/go-kit/kit/log"
 	kithttp "github.com/go-kit/kit/transport/http"
