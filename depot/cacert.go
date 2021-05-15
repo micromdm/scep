@@ -13,10 +13,12 @@ import (
 
 // CACert represents a new self-signed CA certificate
 type CACert struct {
+	commonName         string
+	country            string
 	organization       string
 	organizationalUnit string
-	country            string
 	years              int
+	keyUsage           x509.KeyUsage
 }
 
 // NewCACert creates a new CACert object with options
@@ -25,6 +27,7 @@ func NewCACert(opts ...CACertOption) *CACert {
 		organization:       "scep-ca",
 		organizationalUnit: "SCEP CA",
 		years:              10,
+		keyUsage:           x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -62,12 +65,27 @@ func WithCountry(country string) CACertOption {
 	}
 }
 
+// WithCommonName specifies the CommonName on the CA template.
+func WithCommonName(name string) CACertOption {
+	return func(c *CACert) {
+		c.commonName = name
+	}
+}
+
+// WithKeyUsage specifies the X.509 Key Usage on the CA template.
+func WithKeyUsage(usage x509.KeyUsage) CACertOption {
+	return func(c *CACert) {
+		c.keyUsage = usage
+	}
+}
+
 // newPkixName creates a new pkix.Name from c
 func (c *CACert) newPkixName() *pkix.Name {
 	return &pkix.Name{
 		Country:            []string{c.country},
 		Organization:       []string{c.organization},
 		OrganizationalUnit: []string{c.organizationalUnit},
+		CommonName:         c.commonName,
 	}
 }
 
@@ -87,7 +105,7 @@ func (c *CACert) SelfSign(rand io.Reader, pub crypto.PublicKey, priv interface{}
 		NotAfter:  time.Now().AddDate(c.years, 0, 0).UTC(),
 
 		// Used for certificate signing only
-		KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		KeyUsage: c.keyUsage,
 
 		// activate CA
 		BasicConstraintsValid: true,

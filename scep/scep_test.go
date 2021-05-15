@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/micromdm/scep/v2/depot"
 	"github.com/micromdm/scep/v2/scep"
 )
 
@@ -242,25 +243,13 @@ func createCaCertWithKeyUsage(t *testing.T, keyUsage x509.KeyUsage) (*x509.Certi
 	if err != nil {
 		t.Fatal(err)
 	}
-	subject := pkix.Name{
-		Country:      []string{"US"},
-		Organization: []string{"MICROMDM"},
-		CommonName:   "MICROMDM SCEP CA",
-	}
-	subjectKeyID, err := cryptoutil.GenerateSubjectKeyID(&key.PublicKey)
-	if err != nil {
-		t.Fatal(err)
-	}
-	authTemplate := x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      subject,
-		NotBefore:    time.Now().Add(-600).UTC(),
-		NotAfter:     time.Now().AddDate(1, 0, 0).UTC(),
-		KeyUsage:     keyUsage,
-		IsCA:         true,
-		SubjectKeyId: subjectKeyID,
-	}
-	crtBytes, err := x509.CreateCertificate(rand.Reader, &authTemplate, &authTemplate, &key.PublicKey, key)
+	caCert := depot.NewCACert(
+		depot.WithCountry("US"),
+		depot.WithOrganization("MICROMDM"),
+		depot.WithCommonName("MICROMDM SCEP CA"),
+		depot.WithKeyUsage(keyUsage),
+	)
+	crtBytes, err := caCert.SelfSign(rand.Reader, &key.PublicKey, key)
 	if err != nil {
 		t.Fatal(err)
 	}
