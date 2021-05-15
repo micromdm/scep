@@ -4,20 +4,16 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"flag"
 	"fmt"
-	"math/big"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
 	"syscall"
-	"time"
 
-	"github.com/micromdm/scep/v2/cryptoutil"
 	"github.com/micromdm/scep/v2/csrverifier"
 	executablecsrverifier "github.com/micromdm/scep/v2/csrverifier/executable"
 	scepdepot "github.com/micromdm/scep/v2/depot"
@@ -237,60 +233,13 @@ func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error)
 }
 
 func createCertificateAuthority(key *rsa.PrivateKey, years int, organization string, organizationalUnit string, country string, depot string) error {
-	var (
-		authPkixName = pkix.Name{
-			Country:            nil,
-			Organization:       nil,
-			OrganizationalUnit: nil,
-			Locality:           nil,
-			Province:           nil,
-			StreetAddress:      nil,
-			PostalCode:         nil,
-			SerialNumber:       "",
-			CommonName:         "",
-		}
-		// Build CA based on RFC5280
-		authTemplate = x509.Certificate{
-			SerialNumber: big.NewInt(1),
-			Subject:      authPkixName,
-			// NotBefore is set to be 10min earlier to fix gap on time difference in cluster
-			NotBefore: time.Now().Add(-600).UTC(),
-			NotAfter:  time.Time{},
-			// Used for certificate signing only
-			KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-
-			ExtKeyUsage:        nil,
-			UnknownExtKeyUsage: nil,
-
-			// activate CA
-			BasicConstraintsValid: true,
-			IsCA:                  true,
-			// Not allow any non-self-issued intermediate CA
-			MaxPathLen: 0,
-
-			// 160-bit SHA-1 hash of the value of the BIT STRING subjectPublicKey
-			// (excluding the tag, length, and number of unused bits)
-			// **SHOULD** be filled in later
-			SubjectKeyId: nil,
-
-			// Subject Alternative Name
-			DNSNames: nil,
-
-			PermittedDNSDomainsCritical: false,
-			PermittedDNSDomains:         nil,
-		}
+	cert := scepdepot.NewCACert(
+		scepdepot.WithYears(years),
+		scepdepot.WithOrganization(organization),
+		scepdepot.WithOrganizationalUnit(organizationalUnit),
+		scepdepot.WithCountry(country),
 	)
-
-	subjectKeyID, err := cryptoutil.GenerateSubjectKeyID(&key.PublicKey)
-	if err != nil {
-		return err
-	}
-	authTemplate.SubjectKeyId = subjectKeyID
-	authTemplate.NotAfter = time.Now().AddDate(years, 0, 0).UTC()
-	authTemplate.Subject.Country = []string{country}
-	authTemplate.Subject.Organization = []string{organization}
-	authTemplate.Subject.OrganizationalUnit = []string{organizationalUnit}
-	crtBytes, err := x509.CreateCertificate(rand.Reader, &authTemplate, &authTemplate, &key.PublicKey, key)
+	crtBytes, err := cert.SelfSign(rand.Reader, &key.PublicKey, key)
 	if err != nil {
 		return err
 	}
