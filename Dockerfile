@@ -5,4 +5,6 @@ COPY ./scepserver-linux-amd64 /usr/bin/scepserver
 
 EXPOSE 8080
 
+VOLUME ["/depot"]
+
 ENTRYPOINT ["scepserver"]
