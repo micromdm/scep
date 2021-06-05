@@ -136,12 +136,12 @@ func MakeSCEPEndpoint(svc Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(SCEPRequest)
 		resp := SCEPResponse{operation: req.Operation}
-		switch req.Operation {
-		case "GetCACaps":
+		switch strings.ToLower(req.Operation) {
+		case "getcacaps":
 			resp.Data, resp.Err = svc.GetCACaps(ctx)
-		case "GetCACert":
+		case "getcacert":
 			resp.Data, resp.CACertNum, resp.Err = svc.GetCACert(ctx, string(req.Message))
-		case "PKIOperation":
+		case "pkioperation":
 			resp.Data, resp.Err = svc.PKIOperation(ctx, req.Message)
 		default:
 			return nil, errors.New("operation not implemented")
