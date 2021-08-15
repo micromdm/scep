@@ -14,10 +14,10 @@ github.com/groob/finalizer v0.0.0-20170707115354-4c2ed49aabda h1:5ikpG9mYCMFiZX0
 github.com/groob/finalizer v0.0.0-20170707115354-4c2ed49aabda/go.mod h1:MyndkAZd5rUMdNogn35MWXBX1UiBigrU8eTj8DoAC2c=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515 h1:T+h1c/A9Gawja4Y9mFVWj2vyii2bbUNDw3kt9VxK2EY=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
-github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568 h1:+MPqEswjYiS0S1FCTg8MIhMBMzxiVQ94rooFwvPPiWk=
-github.com/omorsi/pkcs7 v0.0.0-20210217142924-a7b80a2a8568/go.mod h1:SNgMg+EgDFwmvSmLRTNKC5fegJjB7v23qTQ0XLGUNHk=
 github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+go.mozilla.org/pkcs7 v0.0.0-20210730143726-725912489c62 h1:WyR8exjHM07a8uwgpBCY83RID3Tcg/HKZuU82/bTWOE=
+go.mozilla.org/pkcs7 v0.0.0-20210730143726-725912489c62/go.mod h1:SNgMg+EgDFwmvSmLRTNKC5fegJjB7v23qTQ0XLGUNHk=
 golang.org/x/net v0.0.0-20170726083632-f5079bd7f6f7 h1:1Pw+ZX4dmGORIwGkTwnUr7RFuMhfpCYHXRZNF04XPYs=
 golang.org/x/net v0.0.0-20170726083632-f5079bd7f6f7/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 golang.org/x/sys v0.0.0-20170728174421-0f826bdd13b5 h1:NAjcSWsnFBcOQGn/lxvHouhL7iPC53X8+znVzzQkAEg=
