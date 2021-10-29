@@ -13,7 +13,7 @@ Binary releases are available on the [releases page](https://github.com/micromdm
 
 To compile the SCEP client and server you will need [a Go compiler](https://golang.org/dl/) as well as standard tools like git, make, etc.
 
-1. Clone the repository and get into the source directory: `go get github.com/micromdm/scep && cd src/github.com/micromdm/scep`
+1. Clone the repository and get into the source directory: `git clone https://github.com/micromdm/scep.git && cd scep`
 2. Compile the client and server binaries: `make`
 
 The binaries will be compiled in the current directory and named after the architecture. I.e. `scepclient-linux-amd64` and `scepserver-linux-amd64`.
