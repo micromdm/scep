@@ -43,6 +43,7 @@ func main() {
 	//main flags
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
+		flBindAddress       = flag.String("bind-address", envString("SCEP_BIND_ADDRESS", ""), "address to bind to (blank for all addresses)")
 		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
@@ -67,7 +68,7 @@ func main() {
 		fmt.Println(version)
 		os.Exit(0)
 	}
-	port := ":" + *flPort
+	port := *flBindAddress + ":" + *flPort
 
 	var logger log.Logger
 	{
