@@ -43,8 +43,8 @@ func main() {
 	//main flags
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
-		flBindAddress       = flag.String("bind-address", envString("SCEP_BIND_ADDRESS", ""), "address to bind to (blank for all addresses)")
-		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
+		flHTTPAddr          = flag.String("http-addr", envString("SCEP_HTTP_ADDR", ""), "http listen address. defaults to \":8080\"")
+		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "http port to listen on (if you want to specify an address, use -http-addr instead)")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
@@ -68,7 +68,19 @@ func main() {
 		fmt.Println(version)
 		os.Exit(0)
 	}
-	port := *flBindAddress + ":" + *flPort
+
+	// -http-addr and -port conflict. Don't allow the user to set both.
+	httpAddrSet := setByUser("http-addr", "SCEP_HTTP_ADDR")
+	portSet := setByUser("port", "SCEP_HTTP_LISTEN_PORT")
+	var httpAddr string
+	if httpAddrSet && portSet {
+		fmt.Fprintln(os.Stderr, "cannot set both -http-addr and -port")
+		os.Exit(1)
+	} else if httpAddrSet {
+		httpAddr = *flHTTPAddr
+	} else {
+		httpAddr = ":" + *flPort
+	}
 
 	var logger log.Logger
 	{
@@ -157,8 +169,8 @@ func main() {
 	// start http server
 	errs := make(chan error, 2)
 	go func() {
-		lginfo.Log("transport", "http", "address", port, "msg", "listening")
-		errs <- http.ListenAndServe(port, h)
+		lginfo.Log("transport", "http", "address", httpAddr, "msg", "listening")
+		errs <- http.ListenAndServe(httpAddr, h)
 	}()
 	go func() {
 		c := make(chan os.Signal)
@@ -288,4 +300,14 @@ func envBool(key string) bool {
 		return true
 	}
 	return false
+}
+
+func setByUser(flagName, envName string) bool {
+	userDefinedFlags := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		userDefinedFlags[f.Name] = true
+	})
+	flagSet := userDefinedFlags[flagName]
+	_, envSet := os.LookupEnv(envName)
+	return flagSet || envSet
 }
