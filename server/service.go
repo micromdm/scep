@@ -39,6 +39,8 @@ type service struct {
 	// specific keypair in the case of e.g. RA (proxy) operation.
 	crt *x509.Certificate
 	key *rsa.PrivateKey
+	// truststore used to validate signatures of UpdateReq or RenewalReq
+	truststore *x509.CertPool
 
 	// Optional additional CA certificates for e.g. RA (proxy) use.
 	// Only used in this service when responding to GetCACert.
@@ -72,11 +74,19 @@ func (svc *service) GetCACert(ctx context.Context, _ string) ([]byte, int, error
 }
 
 func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
-	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(svc.debugLogger))
+	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(svc.debugLogger), scep.WithTrustStore(svc.truststore))
 	if err != nil {
+		if msg != nil {
+			certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest)
+			return certRep.Raw, err
+		}
 		return nil, err
 	}
 	if err := msg.DecryptPKIEnvelope(svc.crt, svc.key); err != nil {
+		if msg != nil {
+			certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest)
+			return certRep.Raw, err
+		}
 		return nil, err
 	}
 
@@ -114,6 +124,14 @@ func WithLogger(logger log.Logger) ServiceOption {
 func WithAddlCA(ca *x509.Certificate) ServiceOption {
 	return func(s *service) error {
 		s.addlCa = append(s.addlCa, ca)
+		return nil
+	}
+}
+
+// WithTrustStore set the truststore used to validate renewal requests
+func WithTrustStore(truststore *x509.CertPool) ServiceOption {
+	return func(s *service) error {
+		s.truststore = truststore
 		return nil
 	}
 }

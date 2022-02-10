@@ -146,9 +146,18 @@ func WithLogger(logger log.Logger) Option {
 // WithCACerts adds option CA certificates to the SCEP operations.
 // Note: This changes the verification behavior of PKCS #7 messages. If this
 // option is specified, only caCerts will be used as expected signers.
+// only useful for client side
 func WithCACerts(caCerts []*x509.Certificate) Option {
 	return func(c *config) {
 		c.caCerts = caCerts
+	}
+}
+
+// WithTrustStore allows to set the server truststore.
+// This truststore is used to validate signatures of UpdateReq or RenewalReq as per RFC https://datatracker.ietf.org/doc/html/rfc8894
+func WithTrustStore(truststore *x509.CertPool) Option {
+	return func(c *config) {
+		c.truststore = truststore
 	}
 }
 
@@ -168,14 +177,16 @@ type Option func(*config)
 
 type config struct {
 	logger        log.Logger
-	caCerts       []*x509.Certificate // specified if CA certificates have already been retrieved
+	caCerts       []*x509.Certificate // specified if CA certificates have already been retrieved, only useful for client side usage
 	certsSelector CertsSelector
+	// truststore for the server to be able to validate signatures of UpdateReq or RenewalReq
+	truststore *x509.CertPool
 }
 
 // PKIMessage defines the possible SCEP message types
 type PKIMessage struct {
-	TransactionID
-	MessageType
+	TransactionID TransactionID
+	MessageType   MessageType
 	SenderNonce
 	*CertRepMessage
 	*CSRReqMessage
@@ -215,6 +226,7 @@ type CertRepMessage struct {
 // The content of this message is protected
 // by the recipient public key(example CA)
 type CSRReqMessage struct {
+	MessageType
 	RawDecrypted []byte
 
 	// PKCS#10 Certificate request inside the envelope
@@ -248,17 +260,13 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		p7.Certificates = conf.caCerts
 	}
 
-	if err := p7.Verify(); err != nil {
+	var msgType MessageType
+	if err := p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType); err != nil {
 		return nil, err
 	}
 
 	var tID TransactionID
 	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
-		return nil, err
-	}
-
-	var msgType MessageType
-	if err := p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType); err != nil {
 		return nil, err
 	}
 
@@ -270,6 +278,16 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		logger:        conf.logger,
 	}
 
+	var truststore *x509.CertPool
+	if msgType != PKCSReq {
+		// for renewal (RenewalReq or UpdateReq) we MUST validate that the request has been signed by the client certificate we previously issued in response to a PKCSReq
+		truststore = conf.truststore
+	}
+
+	if err := p7.VerifyWithChain(truststore); err != nil {
+		return msg, err
+	}
+
 	// log relevant key-values when parsing a pkiMessage.
 	logKeyVals := []interface{}{
 		"msg", "parsed scep pkiMessage",
@@ -279,7 +297,7 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	level.Debug(msg.logger).Log(logKeyVals...)
 
 	if err := msg.parseMessageType(); err != nil {
-		return nil, err
+		return msg, err
 	}
 
 	return msg, nil
@@ -375,6 +393,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 			return errors.Wrap(err, "scep: parse challenge password in pkiEnvelope")
 		}
 		msg.CSRReqMessage = &CSRReqMessage{
+			MessageType:       msg.MessageType,
 			RawDecrypted:      msg.pkiEnvelope,
 			CSR:               csr,
 			ChallengePassword: cp,

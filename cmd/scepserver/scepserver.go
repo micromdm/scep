@@ -137,6 +137,14 @@ func main() {
 		if csrVerifier != nil {
 			signer = csrverifier.Middleware(csrVerifier, signer)
 		}
+		truststore := x509.NewCertPool()
+		for _, cert := range crts {
+			truststore.AddCert(cert)
+		}
+		svc, err = scepserver.NewService(crts[0], key, signer,
+			scepserver.WithLogger(logger),
+			scepserver.WithTrustStore(truststore),
+		)
 		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger))
 		if err != nil {
 			lginfo.Log("err", err)
