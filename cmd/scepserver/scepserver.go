@@ -145,7 +145,6 @@ func main() {
 			scepserver.WithLogger(logger),
 			scepserver.WithTrustStore(truststore),
 		)
-		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger))
 		if err != nil {
 			lginfo.Log("err", err)
 			os.Exit(1)
