@@ -52,6 +52,7 @@ func main() {
 		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
+		flRenewalEnabled    = flag.Bool("renewalenabled", envBool("SCEP_ENABLE_RENEWAL"), "Enable renewal requests")
 	)
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -144,6 +145,7 @@ func main() {
 		svc, err = scepserver.NewService(crts[0], key, signer,
 			scepserver.WithLogger(logger),
 			scepserver.WithTrustStore(truststore),
+			scepserver.WithRenewalEnabled(*flRenewalEnabled),
 		)
 		if err != nil {
 			lginfo.Log("err", err)

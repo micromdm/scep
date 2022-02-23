@@ -53,6 +53,9 @@ type service struct {
 
 	/// info logging is implemented in the service middleware layer.
 	debugLogger log.Logger
+
+	// flag to enable renewal requests
+	renewalEnabled bool
 }
 
 func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -74,7 +77,7 @@ func (svc *service) GetCACert(ctx context.Context, _ string) ([]byte, int, error
 }
 
 func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, error) {
-	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(svc.debugLogger), scep.WithTrustStore(svc.truststore))
+	msg, err := scep.ParsePKIMessage(data, scep.WithLogger(svc.debugLogger), scep.WithTrustStore(svc.truststore), scep.WithRenewalEnabled(svc.renewalEnabled))
 	if err != nil {
 		if msg != nil {
 			certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest)
@@ -132,6 +135,14 @@ func WithAddlCA(ca *x509.Certificate) ServiceOption {
 func WithTrustStore(truststore *x509.CertPool) ServiceOption {
 	return func(s *service) error {
 		s.truststore = truststore
+		return nil
+	}
+}
+
+// WithRenewalEnabled allows to enable renewal requests.
+func WithRenewalEnabled(enabled bool) ServiceOption {
+	return func(s *service) error {
+		s.renewalEnabled = enabled
 		return nil
 	}
 }

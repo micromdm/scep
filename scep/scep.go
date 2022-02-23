@@ -172,6 +172,13 @@ func WithCertsSelector(selector CertsSelector) Option {
 	}
 }
 
+// WithRenewalEnabled allows to enable renewal requests.
+func WithRenewalEnabled(enabled bool) Option {
+	return func(c *config) {
+		c.renewalEnabled = enabled
+	}
+}
+
 // Option specifies custom configuration for SCEP.
 type Option func(*config)
 
@@ -181,6 +188,8 @@ type config struct {
 	certsSelector CertsSelector
 	// truststore for the server to be able to validate signatures of UpdateReq or RenewalReq
 	truststore *x509.CertPool
+	// flag to enable renewal requests
+	renewalEnabled bool
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -279,9 +288,14 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	}
 
 	var truststore *x509.CertPool
-	if msgType != PKCSReq {
-		// for renewal (RenewalReq or UpdateReq) we MUST validate that the request has been signed by the client certificate we previously issued in response to a PKCSReq
-		truststore = conf.truststore
+	if msgType == RenewalReq || msgType == UpdateReq {
+		if conf.renewalEnabled {
+			// for renewal (RenewalReq or UpdateReq) we MUST validate that the request has been signed by the client certificate we previously issued in response to a PKCSReq
+			truststore = conf.truststore
+		} else {
+			return msg, errors.New("Renewal requests are not allowed")
+		}
+
 	}
 
 	if err := p7.VerifyWithChain(truststore); err != nil {
