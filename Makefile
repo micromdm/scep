@@ -6,6 +6,7 @@ SCEPCLIENT=\
 	scepclient-linux-amd64 \
 	scepclient-linux-arm \
 	scepclient-darwin-amd64 \
+	scepclient-darwin-arm64 \
 	scepclient-freebsd-amd64 \
 	scepclient-windows-amd64.exe
 
@@ -13,6 +14,7 @@ SCEPSERVER=\
 	scepserver-linux-amd64 \
 	scepserver-linux-arm \
 	scepserver-darwin-amd64 \
+	scepserver-darwin-arm64 \
 	scepserver-freebsd-amd64 \
 	scepserver-windows-amd64.exe
 
