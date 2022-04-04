@@ -52,6 +52,7 @@ func main() {
 		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
+		flSignServerAttrs   = flag.Bool("sign-server-attrs", envBool("SCEP_SIGN_SERVER_ATTRS"), "sign cert attrs for server usage")
 	)
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -125,12 +126,15 @@ func main() {
 			lginfo.Log("err", "missing CA certificate")
 			os.Exit(1)
 		}
-		var signer scepserver.CSRSigner = scepdepot.NewSigner(
-			depot,
+		signerOpts := []scepdepot.Option{
 			scepdepot.WithAllowRenewalDays(allowRenewal),
 			scepdepot.WithValidityDays(clientValidity),
 			scepdepot.WithCAPass(*flCAPass),
-		)
+		}
+		if *flSignServerAttrs {
+			signerOpts = append(signerOpts, scepdepot.WithSeverAttrs())
+		}
+		var signer scepserver.CSRSigner = scepdepot.NewSigner(depot, signerOpts...)
 		if *flChallengePassword != "" {
 			signer = scepserver.ChallengeMiddleware(*flChallengePassword, signer)
 		}

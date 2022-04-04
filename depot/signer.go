@@ -17,6 +17,7 @@ type Signer struct {
 	caPass           string
 	allowRenewalDays int
 	validityDays     int
+	serverAttrs      bool
 }
 
 // Option customizes Signer
@@ -56,6 +57,12 @@ func WithValidityDays(v int) Option {
 	}
 }
 
+func WithSeverAttrs() Option {
+	return func(s *Signer) {
+		s.serverAttrs = true
+	}
+}
+
 // SignCSR signs a certificate using Signer's Depot CA
 func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 	id, err := cryptoutil.GenerateSubjectKeyID(m.CSR.PublicKey)
@@ -87,6 +94,11 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		EmailAddresses:     m.CSR.EmailAddresses,
 		IPAddresses:        m.CSR.IPAddresses,
 		URIs:               m.CSR.URIs,
+	}
+
+	if s.serverAttrs {
+		tmpl |= x509.KeyUsageDataEncipherment
+		tmpl.ExtKeyUsage = append(tmpl.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
 	}
 
 	caCerts, caKey, err := s.depot.CA([]byte(s.caPass))
