@@ -97,7 +97,7 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 	}
 
 	if s.serverAttrs {
-		tmpl.KeyUsage |= x509.KeyUsageDataEncipherment
+		tmpl.KeyUsage |= x509.KeyUsageDataEncipherment | x509.KeyUsageKeyEncipherment
 		tmpl.ExtKeyUsage = append(tmpl.ExtKeyUsage, x509.ExtKeyUsageServerAuth)
 	}
 
