@@ -582,6 +582,8 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 		return nil, err
 	}
 
+	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+	
 	// create transaction ID from public key hash
 	tID, err := newTransactionID(csr.PublicKey)
 	if err != nil {
