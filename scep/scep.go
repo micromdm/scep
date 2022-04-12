@@ -424,7 +424,7 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 	}
 
 	sd.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
-	
+
 	// sign the attributes
 	if err := sd.AddSigner(crtAuth, keyAuth, config); err != nil {
 		return nil, err
@@ -504,9 +504,9 @@ func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 	if err != nil {
 		return nil, err
 	}
-	
+
 	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
-	
+
 	// add the certificate into the signed data type
 	// this cert must be added before the signedData because the recipient will expect it
 	// as the first certificate in the array
@@ -588,7 +588,7 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 	}
 
 	signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
-	
+
 	// create transaction ID from public key hash
 	tID, err := newTransactionID(csr.PublicKey)
 	if err != nil {
