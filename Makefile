@@ -18,7 +18,7 @@ SCEPSERVER=\
 	scepserver-freebsd-amd64 \
 	scepserver-windows-amd64.exe
 
-my: scepclient-$(OSARCH) scepserver-$(OSARCH)
+my: scepclient-$(OSARCH).exe scepserver-$(OSARCH).exe
 
 docker: scepclient-linux-amd64 scepserver-linux-amd64
 

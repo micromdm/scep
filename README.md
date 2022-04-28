@@ -79,7 +79,7 @@ usage: scep [<command>] [<args>]
 type <command> --help to see usage for each subcommand
 ```
 
-Use the `ca -init` subcommand to create a new CA and private key. 
+Use the `ca -init` subcommand to create a new CA and private key.
 
 CA sub-command usage:
 ```
@@ -95,6 +95,8 @@ Usage of ca:
     	password to store rsa key
   -keySize int
     	rsa key size (default 4096)
+  -common_name string
+        common name (CN) for CA cert (default "MICROMDM SCEP CA")
   -organization string
     	organization for CA cert (default "scep-ca")
   -organizational_unit string

@@ -170,14 +170,15 @@ func main() {
 
 func caMain(cmd *flag.FlagSet) int {
 	var (
-		flDepotPath = cmd.String("depot", "depot", "path to ca folder")
-		flInit      = cmd.Bool("init", false, "create a new CA")
-		flYears     = cmd.Int("years", 10, "default CA years")
-		flKeySize   = cmd.Int("keySize", 4096, "rsa key size")
-		flOrg       = cmd.String("organization", "scep-ca", "organization for CA cert")
-		flOrgUnit   = cmd.String("organizational_unit", "SCEP CA", "organizational unit (OU) for CA cert")
-		flPassword  = cmd.String("key-password", "", "password to store rsa key")
-		flCountry   = cmd.String("country", "US", "country for CA cert")
+		flDepotPath  = cmd.String("depot", "depot", "path to ca folder")
+		flInit       = cmd.Bool("init", false, "create a new CA")
+		flYears      = cmd.Int("years", 10, "default CA years")
+		flKeySize    = cmd.Int("keySize", 4096, "rsa key size")
+		flCommonName = cmd.String("common_name", "MICROMDM SCEP CA", "common name (CN) for CA cert")
+		flOrg        = cmd.String("organization", "scep-ca", "organization for CA cert")
+		flOrgUnit    = cmd.String("organizational_unit", "SCEP CA", "organizational unit (OU) for CA cert")
+		flPassword   = cmd.String("key-password", "", "password to store rsa key")
+		flCountry    = cmd.String("country", "US", "country for CA cert")
 	)
 	cmd.Parse(os.Args[2:])
 	if *flInit {
@@ -187,7 +188,7 @@ func caMain(cmd *flag.FlagSet) int {
 			fmt.Println(err)
 			return 1
 		}
-		if err := createCertificateAuthority(key, *flYears, *flOrg, *flOrgUnit, *flCountry, *flDepotPath); err != nil {
+		if err := createCertificateAuthority(key, *flYears, *flCommonName, *flOrg, *flOrgUnit, *flCountry, *flDepotPath); err != nil {
 			fmt.Println(err)
 			return 1
 		}
@@ -232,9 +233,10 @@ func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error)
 	return key, nil
 }
 
-func createCertificateAuthority(key *rsa.PrivateKey, years int, organization string, organizationalUnit string, country string, depot string) error {
+func createCertificateAuthority(key *rsa.PrivateKey, years int, commonName string, organization string, organizationalUnit string, country string, depot string) error {
 	cert := scepdepot.NewCACert(
 		scepdepot.WithYears(years),
+		scepdepot.WithCommonName(commonName),
 		scepdepot.WithOrganization(organization),
 		scepdepot.WithOrganizationalUnit(organizationalUnit),
 		scepdepot.WithCountry(country),
