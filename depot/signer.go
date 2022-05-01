@@ -75,7 +75,7 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
 		Subject:      m.CSR.Subject,
-		NotBefore:    time.Now().Add(-600).UTC(),
+		NotBefore:    time.Now().Add(time.Second * -600).UTC(),
 		NotAfter:     time.Now().AddDate(0, 0, s.validityDays).UTC(),
 		SubjectKeyId: id,
 		KeyUsage:     x509.KeyUsageDigitalSignature,
