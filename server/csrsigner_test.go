@@ -10,7 +10,7 @@ func TestChallengeMiddleware(t *testing.T) {
 	testPW := "RIGHT"
 	signer := ChallengeMiddleware(testPW, NopCSRSigner())
 
-	csrReq := &scep.CSRReqMessage{ChallengePassword: testPW}
+	csrReq := &scep.CSRReqMessage{MessageType: scep.PKCSReq, ChallengePassword: testPW}
 
 	_, err := signer.SignCSR(csrReq)
 	if err != nil {

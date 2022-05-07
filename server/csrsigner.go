@@ -35,9 +35,10 @@ func NopCSRSigner() CSRSignerFunc {
 func ChallengeMiddleware(challenge string, next CSRSigner) CSRSignerFunc {
 	challengeBytes := []byte(challenge)
 	return func(m *scep.CSRReqMessage) (*x509.Certificate, error) {
-		// TODO: compare challenge only for PKCSReq?
-		if subtle.ConstantTimeCompare(challengeBytes, []byte(m.ChallengePassword)) != 1 {
-			return nil, errors.New("invalid challenge")
+		if m.MessageType == scep.PKCSReq {
+			if subtle.ConstantTimeCompare(challengeBytes, []byte(m.ChallengePassword)) != 1 {
+				return nil, errors.New("invalid challenge")
+			}
 		}
 		return next.SignCSR(m)
 	}
