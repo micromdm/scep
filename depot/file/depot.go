@@ -200,7 +200,7 @@ func (d *fileDepot) HasCN(_ string, allowTime int, cert *x509.Certificate, revok
 			// Removing revoked certificate from candidates, if any
 			if strings.HasPrefix(line, "R\t") {
 				entries := strings.Split(line, "\t")
-				serial := strings.ToUpper(entries[3])
+				serial := entries[3]
 				candidates[serial] = line
 				delete(candidates, serial)
 				addDB.WriteString(line + "\n")
@@ -215,7 +215,7 @@ func (d *fileDepot) HasCN(_ string, allowTime int, cert *x509.Certificate, revok
 					return false, errors.New("Could not calculate expiry date")
 				}
 				entries := strings.Split(line, "\t")
-				serial := strings.ToUpper(entries[3])
+				serial := entries[3]
 
 				// all non renewable certificates
 				if minimalRenewDate < issueDate && allowTime > 0 {
@@ -236,7 +236,7 @@ func (d *fileDepot) HasCN(_ string, allowTime int, cert *x509.Certificate, revok
 		if revokeOldCertificate {
 			fmt.Println("Revoking certificate with serial " + key + " from DB. Recreation of CRL needed.")
 			entries := strings.Split(value, "\t")
-			addDB.WriteString("R\t" + entries[1] + "\t" + makeOpenSSLTime(time.Now()) + "\t" + strings.ToUpper(entries[3]) + "\t" + entries[4] + "\t" + entries[5] + "\n")
+			addDB.WriteString("R\t" + entries[1] + "\t" + makeOpenSSLTime(time.Now()) + "\t" + entries[3] + "\t" + entries[4] + "\t" + entries[5] + "\n")
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -276,7 +276,7 @@ func (d *fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x
 	// Format of the caDB, see http://pki-tutorial.readthedocs.io/en/latest/cadb.html
 	//   STATUSFLAG  EXPIRATIONDATE  REVOCATIONDATE(or emtpy)	SERIAL_IN_HEX   CERTFILENAME_OR_'unknown'   Certificate_DN
 
-	serialHex := fmt.Sprintf("%X", cert.SerialNumber)
+	serialHex := fmt.Sprintf("%x", cert.SerialNumber)
 	if len(serialHex)%2 == 1 {
 		serialHex = fmt.Sprintf("0%s", serialHex)
 	}
