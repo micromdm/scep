@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/micromdm/scep/v2/depot"
 	filedepot "github.com/micromdm/scep/v2/depot/file"
 	scepserver "github.com/micromdm/scep/v2/server"
@@ -133,6 +134,9 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 		depot = &noopDepot{depot}
 	}
 	crt, key, err := depot.CA([]byte{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	var svc scepserver.Service // scep service
 	{
 		svc, err = scepserver.NewService(crt[0], key, scepserver.NopCSRSigner())
@@ -142,8 +146,10 @@ func newServer(t *testing.T, opts ...scepserver.ServiceOption) (*httptest.Server
 	}
 	logger := kitlog.NewNopLogger()
 	e := scepserver.MakeServerEndpoints(svc)
-	handler := scepserver.MakeHTTPHandler(e, svc, logger)
-	server := httptest.NewServer(handler)
+	scepHandler := scepserver.MakeHTTPHandler(e, svc, logger)
+	r := mux.NewRouter()
+	r.Handle("/scep", scepHandler)
+	server := httptest.NewServer(r)
 	teardown := func() {
 		server.Close()
 		os.Remove("../scep/testdata/testca/serial")

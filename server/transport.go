@@ -24,13 +24,13 @@ func MakeHTTPHandler(e *Endpoints, svc Service, logger kitlog.Logger) http.Handl
 	}
 
 	r := mux.NewRouter()
-	r.Methods("GET").Path("/scep").Handler(kithttp.NewServer(
+	r.Methods("GET").Handler(kithttp.NewServer(
 		e.GetEndpoint,
 		decodeSCEPRequest,
 		encodeSCEPResponse,
 		opts...,
 	))
-	r.Methods("POST").Path("/scep").Handler(kithttp.NewServer(
+	r.Methods("POST").Handler(kithttp.NewServer(
 		e.PostEndpoint,
 		decodeSCEPRequest,
 		encodeSCEPResponse,

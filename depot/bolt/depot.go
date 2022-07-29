@@ -14,7 +14,7 @@ import (
 	"github.com/boltdb/bolt"
 )
 
-// Depot implements a SCEP certifiacte store using boltdb.
+// Depot implements a SCEP certificate store using boltdb.
 // https://github.com/boltdb/bolt
 type Depot struct {
 	*bolt.DB

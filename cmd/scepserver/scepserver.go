@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/gorilla/mux"
 	"github.com/micromdm/scep/v2/csrverifier"
 	executablecsrverifier "github.com/micromdm/scep/v2/csrverifier/executable"
 	scepdepot "github.com/micromdm/scep/v2/depot"
@@ -167,7 +168,10 @@ func main() {
 		e := scepserver.MakeServerEndpoints(svc)
 		e.GetEndpoint = scepserver.EndpointLoggingMiddleware(lginfo)(e.GetEndpoint)
 		e.PostEndpoint = scepserver.EndpointLoggingMiddleware(lginfo)(e.PostEndpoint)
-		h = scepserver.MakeHTTPHandler(e, svc, log.With(lginfo, "component", "http"))
+		scepHandler := scepserver.MakeHTTPHandler(e, svc, log.With(lginfo, "component", "http"))
+		r := mux.NewRouter()
+		r.Handle("/scep", scepHandler)
+		h = r
 	}
 
 	// start http server
@@ -177,7 +181,7 @@ func main() {
 		errs <- http.ListenAndServe(httpAddr, h)
 	}()
 	go func() {
-		c := make(chan os.Signal)
+		c := make(chan os.Signal, 1)
 		signal.Notify(c, syscall.SIGINT)
 		errs <- fmt.Errorf("%s", <-c)
 	}()
