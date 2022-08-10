@@ -50,6 +50,7 @@ type runCfg struct {
 	debug           bool
 	logfmt          string
 	caCertMsg       string
+	dnsname         string
 }
 
 func run(cfg runCfg) error {
@@ -88,6 +89,7 @@ func run(cfg runCfg) error {
 		province:  cfg.province,
 		challenge: cfg.challenge,
 		key:       key,
+		dnsnames:  cfg.dnsname,
 	}
 
 	csr, err := loadOrMakeCSR(cfg.csrPath, opts)
@@ -279,6 +281,7 @@ func main() {
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
 		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
+		flDNSName           = flag.String("dnsname", "", "DNS name to be included in the certificate")
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
@@ -340,6 +343,7 @@ func main() {
 		debug:           *flDebugLogging,
 		logfmt:          logfmt,
 		caCertMsg:       *flCACertMessage,
+		dnsname:         *flDNSName,
 	}
 
 	if err := run(cfg); err != nil {

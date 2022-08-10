@@ -19,6 +19,7 @@ const (
 
 type csrOptions struct {
 	cn, org, country, ou, locality, province, challenge string
+	cn, org, country, ou, locality, province, dnsnames, challenge string
 	key                                                 *rsa.PrivateKey
 }
 
@@ -44,6 +45,7 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 		CertificateRequest: x509.CertificateRequest{
 			Subject:            subject,
 			SignatureAlgorithm: x509.SHA256WithRSA,
+			DNSNames:           subjOrNil(opts.dnsnames),
 		},
 	}
 	if opts.challenge != "" {
