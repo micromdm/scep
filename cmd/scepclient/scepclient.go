@@ -281,7 +281,7 @@ func main() {
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
 		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
-		flDNSName           = flag.String("dnsname", "", "DNS name to be included in the certificate")
+		flDNSName           = flag.String("dnsname", "", "DNS name to be included in the certificate (SAN)")
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is.
