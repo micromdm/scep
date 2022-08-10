@@ -44,7 +44,7 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 		CertificateRequest: x509.CertificateRequest{
 			Subject:            subject,
 			SignatureAlgorithm: x509.SHA256WithRSA,
-			DNSNames:           subjOrNil(opts.dnsnames),
+			DNSNames:           subjOrNil(opts.dnsName),
 		},
 	}
 	if opts.challenge != "" {

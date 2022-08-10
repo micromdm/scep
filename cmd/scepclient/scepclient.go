@@ -89,7 +89,7 @@ func run(cfg runCfg) error {
 		province:  cfg.province,
 		challenge: cfg.challenge,
 		key:       key,
-		dnsnames:  cfg.dnsname,
+		dnsName:   cfg.dnsName,
 	}
 
 	csr, err := loadOrMakeCSR(cfg.csrPath, opts)
@@ -343,7 +343,7 @@ func main() {
 		debug:           *flDebugLogging,
 		logfmt:          logfmt,
 		caCertMsg:       *flCACertMessage,
-		dnsname:         *flDNSName,
+		dnsName:         *flDNSName,
 	}
 
 	if err := run(cfg); err != nil {
