@@ -18,7 +18,6 @@ const (
 )
 
 type csrOptions struct {
-	cn, org, country, ou, locality, province, challenge string
 	cn, org, country, ou, locality, province, dnsnames, challenge string
 	key                                                 *rsa.PrivateKey
 }
