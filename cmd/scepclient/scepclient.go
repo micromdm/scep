@@ -50,7 +50,7 @@ type runCfg struct {
 	debug           bool
 	logfmt          string
 	caCertMsg       string
-	dnsname         string
+	dnsName         string
 }
 
 func run(cfg runCfg) error {
