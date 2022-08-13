@@ -85,7 +85,6 @@ const (
 // reasons:
 type FailInfo string
 
-//
 const (
 	BadAlg          FailInfo = "0"
 	BadMessageCheck          = "1"
