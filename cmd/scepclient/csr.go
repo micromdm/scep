@@ -19,7 +19,7 @@ const (
 
 type csrOptions struct {
 	cn, org, country, ou, locality, province, dnsName, challenge string
-	key                                                 *rsa.PrivateKey
+	key                                                          *rsa.PrivateKey
 }
 
 func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, error) {
