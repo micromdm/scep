@@ -4,9 +4,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
+	"go.mozilla.org/pkcs7"
 	"net/http"
 	"os"
 	"os/signal"
@@ -29,6 +32,21 @@ var (
 	version = "unknown"
 )
 
+var digestStringOIMap = map[string]asn1.ObjectIdentifier{
+	"SHA1":        pkcs7.OIDDigestAlgorithmSHA1,
+	"SHA256":      pkcs7.OIDDigestAlgorithmSHA256,
+	"SHA384":      pkcs7.OIDDigestAlgorithmSHA384,
+	"SHA512":      pkcs7.OIDDigestAlgorithmSHA512,
+	"DSA":         pkcs7.OIDDigestAlgorithmDSA,
+	"DSASHA1":     pkcs7.OIDDigestAlgorithmDSASHA1,
+	"ECDSASHA1":   pkcs7.OIDDigestAlgorithmECDSASHA1,
+	"ECDSASHA256": pkcs7.OIDDigestAlgorithmECDSASHA256,
+	"ECDSASHA384": pkcs7.OIDDigestAlgorithmECDSASHA384,
+	"ECDSASHA512": pkcs7.OIDDigestAlgorithmECDSASHA512,
+}
+
+var digest = pkcs7.OIDDigestAlgorithmSHA256
+
 func main() {
 	var caCMD = flag.NewFlagSet("ca", flag.ExitOnError)
 	{
@@ -40,11 +58,10 @@ func main() {
 		}
 	}
 
-	//main flags
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flHTTPAddr          = flag.String("http-addr", envString("SCEP_HTTP_ADDR", ""), "http listen address. defaults to \":8080\"")
-		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "http port to listen on (if you want to specify an address, use -http-addr instead)")
+		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8081"), "http port to listen on (if you want to specify an address, use -http-addr instead)")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
@@ -55,6 +72,9 @@ func main() {
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
 		flSignServerAttrs   = flag.Bool("sign-server-attrs", envBool("SCEP_SIGN_SERVER_ATTRS"), "sign cert attrs for server usage")
 	)
+	//main flags
+	flag.Func("digest-algo", "digest algorithm for pkcs7", parseUserDefinedDigestAlgo)
+
 	flag.Usage = func() {
 		flag.PrintDefaults()
 
@@ -154,7 +174,7 @@ func main() {
 		if csrVerifier != nil {
 			signer = csrverifier.Middleware(csrVerifier, signer)
 		}
-		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger))
+		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger), scepserver.WithDigestAlgo(digest))
 		if err != nil {
 			lginfo.Log("err", err)
 			os.Exit(1)
@@ -316,4 +336,16 @@ func setByUser(flagName, envName string) bool {
 	flagSet := userDefinedFlags[flagName]
 	_, envSet := os.LookupEnv(envName)
 	return flagSet || envSet
+}
+
+func parseUserDefinedDigestAlgo(s string) error {
+	if s == "" {
+		return nil
+	}
+	if v, ok := digestStringOIMap[s]; !ok {
+		return errors.New("invalid value for digest algo")
+	} else {
+		digest = v
+	}
+	return nil
 }
