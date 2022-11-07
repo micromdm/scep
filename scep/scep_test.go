@@ -122,7 +122,7 @@ func TestSignCSR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	certRep, err := msg.Success(cacert, cakey, crt)
+	certRep, err := msg.Success(cacert, cakey, crt, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

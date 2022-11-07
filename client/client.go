@@ -14,10 +14,7 @@ type Client interface {
 }
 
 // New creates a SCEP Client.
-func New(
-	serverURL string,
-	logger log.Logger,
-) (Client, error) {
+func New(serverURL string, logger log.Logger) (Client, error) {
 	endpoints, err := scepserver.MakeClientEndpoints(serverURL)
 	if err != nil {
 		return nil, err
@@ -25,5 +22,6 @@ func New(
 	logger = level.Info(logger)
 	endpoints.GetEndpoint = scepserver.EndpointLoggingMiddleware(logger)(endpoints.GetEndpoint)
 	endpoints.PostEndpoint = scepserver.EndpointLoggingMiddleware(logger)(endpoints.PostEndpoint)
+
 	return endpoints, nil
 }

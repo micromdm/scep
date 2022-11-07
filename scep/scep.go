@@ -162,13 +162,25 @@ func WithCertsSelector(selector CertsSelector) Option {
 	}
 }
 
+// WithDigestAlgorithm sets the PKCS #7 digest algorithm. Note that
+//in go versions >=1.18 setting the algo as SHA1 will cause x509
+//verify function to failed due to unsecure algo.
+// This option is effective when used with NewCSRRequest function. In
+// this case, the PKCS #7 digest algo will be set to the specified value
+func WithDigestAlgorithm(identifier asn1.ObjectIdentifier) Option {
+	return func(c *config) {
+		c.digestAlgorithm = identifier
+	}
+}
+
 // Option specifies custom configuration for SCEP.
 type Option func(*config)
 
 type config struct {
-	logger        log.Logger
-	caCerts       []*x509.Certificate // specified if CA certificates have already been retrieved
-	certsSelector CertsSelector
+	logger          log.Logger
+	caCerts         []*x509.Certificate // specified if CA certificates have already been retrieved
+	certsSelector   CertsSelector
+	digestAlgorithm asn1.ObjectIdentifier
 }
 
 // PKIMessage defines the possible SCEP message types
@@ -387,7 +399,7 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 	}
 }
 
-func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, info FailInfo) (*PKIMessage, error) {
+func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, info FailInfo, digestAlgo asn1.ObjectIdentifier) (*PKIMessage, error) {
 	config := pkcs7.SignerInfoConfig{
 		ExtraSignedAttributes: []pkcs7.Attribute{
 			{
@@ -418,6 +430,12 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 	}
 
 	sd, err := pkcs7.NewSignedData(nil)
+	if digestAlgo != nil && len(digestAlgo) > 0 {
+		sd.SetDigestAlgorithm(digestAlgo)
+	} else {
+		//default to sha256 since golang 1.18 prohibits sha1
+		sd.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -451,7 +469,7 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 }
 
 // Success returns a new PKIMessage with CertRep data using an already-issued certificate
-func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, crt *x509.Certificate) (*PKIMessage, error) {
+func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, crt *x509.Certificate, digestAlgo asn1.ObjectIdentifier) (*PKIMessage, error) {
 	// check if CSRReqMessage has already been decrypted
 	if msg.CSRReqMessage.CSR == nil {
 		if err := msg.DecryptPKIEnvelope(crtAuth, keyAuth); err != nil {
@@ -498,6 +516,12 @@ func (msg *PKIMessage) Success(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKe
 	}
 
 	signedData, err := pkcs7.NewSignedData(e7)
+	if digestAlgo != nil && len(digestAlgo) > 0 {
+		signedData.SetDigestAlgorithm(digestAlgo)
+	} else {
+		//default to sha256 since golang 1.18 prohibits sha1
+		signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -571,12 +595,19 @@ func NewCSRRequest(csr *x509.CertificateRequest, tmpl *PKIMessage, opts ...Optio
 		}
 		return nil, errors.New("no CA/RA recipients")
 	}
+
 	e7, err := pkcs7.Encrypt(derBytes, recipients)
 	if err != nil {
 		return nil, err
 	}
 
 	signedData, err := pkcs7.NewSignedData(e7)
+	if conf.digestAlgorithm != nil && len(conf.digestAlgorithm) > 0 {
+		signedData.SetDigestAlgorithm(conf.digestAlgorithm)
+	} else {
+		//default to sha256 since golang 1.18 prohibits sha1
+		signedData.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+	}
 	if err != nil {
 		return nil, err
 	}
