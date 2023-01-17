@@ -360,7 +360,6 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	//hack for intune
 	//we are going to parse the ASN.1 indefinite-length content and replace the p7.content
 	if len(p7.Content) == 1000 {
-		fmt.Printf("APPLYING INTUNE HACK!!!: %+v\n", p7)
 		// getting the raw bytes of the signed data
 		v := reflect.ValueOf(*p7)
 		signedData := v.FieldByName("raw")
