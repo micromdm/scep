@@ -11,6 +11,8 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
+	"fmt"
+	"reflect"
 
 	"github.com/micromdm/scep/v2/cryptoutil"
 	"github.com/micromdm/scep/v2/cryptoutil/x509util"
@@ -223,6 +225,113 @@ type CSRReqMessage struct {
 	ChallengePassword string
 }
 
+// Original implementation without intune hack
+// ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
+// func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
+// 	conf := &config{logger: log.NewNopLogger()}
+// 	for _, opt := range opts {
+// 		opt(conf)
+// 	}
+
+// 	// parse PKCS#7 signed data
+// 	p7, err := pkcs7.Parse(data)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	if len(conf.caCerts) > 0 {
+// 		// According to RFC #2315 Section 9.1, it is valid that the server sends fewer
+// 		// certificates than necessary, if it is expected that those verifying the
+// 		// signatures have an alternate means of obtaining necessary certificates.
+// 		// In SCEP case, an alternate means is to use GetCaCert request.
+// 		// Note: The https://github.com/jscep/jscep implementation logs a warning if
+// 		// no certificates were found for signers in the PKCS #7 received from the
+// 		// server, but the certificates obtained from GetCaCert request are still
+// 		// used for decoding the message.
+// 		p7.Certificates = conf.caCerts
+// 	}
+
+// 	if err := p7.Verify(); err != nil {
+// 		return nil, err
+// 	}
+
+// 	var tID TransactionID
+// 	if err := p7.UnmarshalSignedAttribute(oidSCEPtransactionID, &tID); err != nil {
+// 		return nil, err
+// 	}
+
+// 	var msgType MessageType
+// 	if err := p7.UnmarshalSignedAttribute(oidSCEPmessageType, &msgType); err != nil {
+// 		return nil, err
+// 	}
+
+// 	msg := &PKIMessage{
+// 		TransactionID: tID,
+// 		MessageType:   msgType,
+// 		Raw:           data,
+// 		p7:            p7,
+// 		logger:        conf.logger,
+// 	}
+
+// 	// log relevant key-values when parsing a pkiMessage.
+// 	logKeyVals := []interface{}{
+// 		"msg", "parsed scep pkiMessage",
+// 		"scep_message_type", msgType,
+// 		"transaction_id", tID,
+// 	}
+// 	level.Debug(msg.logger).Log(logKeyVals...)
+
+// 	if err := msg.parseMessageType(); err != nil {
+// 		return nil, err
+// 	}
+
+// 	return msg, nil
+// }
+
+//return content length and new offset
+func parseLength(bytes []byte, offset int) (int, int, error) {
+	b := bytes[offset]
+	offset++
+	class := int(b >> 6)
+	isCompound := b&0x20 == 0x20
+	tag := int(b & 0x1f)
+	fmt.Println(class)
+	fmt.Println(isCompound)
+	fmt.Println(tag)
+
+	b = bytes[offset]
+	offset++
+	length := 0
+
+	if b&0x80 == 0 {
+		length = int(b & 0x7f)
+		return length, offset, nil
+	}
+
+	numBytes := int(b & 0x7f)
+	if numBytes == 0 {
+		return 0, 0, errors.New("scep: numBytes cannot be 0")
+	}
+	for i := 0; i < numBytes; i++ {
+		if offset >= len(bytes) {
+			return 0, 0, errors.New("scep: truncated tag or length")
+		}
+		b = bytes[offset]
+		offset++
+		if length >= 1<<23 {
+			return 0, 0, errors.New("scep: we can't shift length up without overflowing")
+		}
+		length <<= 8
+		length |= int(b)
+		if length == 0 {
+			return 0, 0, errors.New("scep: DER requires that lengths be minimal")
+		}
+	}
+
+	return length, offset, nil
+}
+
+// Implementation with intune hack
 // ParsePKIMessage unmarshals a PKCS#7 signed data into a PKI message struct
 func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 	conf := &config{logger: log.NewNopLogger()}
@@ -246,6 +355,61 @@ func ParsePKIMessage(data []byte, opts ...Option) (*PKIMessage, error) {
 		// server, but the certificates obtained from GetCaCert request are still
 		// used for decoding the message.
 		p7.Certificates = conf.caCerts
+	}
+
+	//hack for intune
+	//we are going to parse the ASN.1 indefinite-length content and replace the p7.content
+	if len(p7.Content) == 1000 {
+		fmt.Printf("APPLYING INTUNE HACK!!!: %+v\n", p7)
+		// getting the raw bytes of the signed data
+		v := reflect.ValueOf(*p7)
+		signedData := v.FieldByName("raw")
+		unwrappedSignedData := signedData.Elem()
+		rawContentInfo := unwrappedSignedData.FieldByName("ContentInfo")
+		content := rawContentInfo.FieldByName("Content")
+		rawBytes := content.FieldByName("Bytes")
+		bytes := rawBytes.Bytes()
+
+		offset := 0
+		wrapperLength, offset, err := parseLength(bytes, 0)
+
+		if err != nil {
+			return nil, err
+		}
+
+		//should we apply the hack?
+		if wrapperLength > 1000+offset {
+
+			//parse the real signed data
+			realData := make([]byte, 0)
+
+			totalLength := len(bytes)
+
+			for offset < totalLength {
+				chunkSize, chunkOffset, err := parseLength(bytes, offset)
+
+				if chunkSize == 0 {
+					return nil, errors.New("scep: chunk size should not be 0")
+				}
+
+				offset = chunkOffset + chunkSize
+
+				if err != nil {
+					return nil, err
+				}
+
+				chunkData := make([]byte, chunkSize)
+
+				for i := 0; i < chunkSize; i++ {
+					chunkData[i] = bytes[chunkOffset+i]
+				}
+
+				realData = append(realData, chunkData...)
+			}
+
+			//replace the content
+			p7.Content = realData
+		}
 	}
 
 	if err := p7.Verify(); err != nil {
