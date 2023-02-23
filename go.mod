@@ -13,6 +13,5 @@ require (
 	github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515 // indirect
 	github.com/pkg/errors v0.8.0
 	go.mozilla.org/pkcs7 v0.0.0-20210826202110-33d05740a352
-	golang.org/x/net v0.0.0-20170726083632-f5079bd7f6f7 // indirect
-	golang.org/x/sys v0.0.0-20170728174421-0f826bdd13b5 // indirect
+	golang.org/x/net v0.7.0 // indirect
 )
