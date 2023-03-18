@@ -11,7 +11,8 @@ import (
 
 	"github.com/micromdm/scep/v2/depot"
 
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Depot implements a SCEP certifiacte store using boltdb.

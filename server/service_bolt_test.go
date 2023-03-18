@@ -20,7 +20,8 @@ import (
 	"github.com/micromdm/scep/v2/scep"
 	scepserver "github.com/micromdm/scep/v2/server"
 
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 func TestCaCert(t *testing.T) {

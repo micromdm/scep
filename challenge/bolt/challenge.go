@@ -5,8 +5,9 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
+	bolt "go.etcd.io/bbolt"
 )
 
 type Depot struct {

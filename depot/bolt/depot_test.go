@@ -7,7 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/boltdb/bolt"
+	//"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 // createDepot creates a Bolt database in a temporary location.
