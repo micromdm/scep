@@ -287,7 +287,7 @@ type CSRReqMessage struct {
 // 	return msg, nil
 // }
 
-//return content length and new offset
+// return content length and new offset
 func parseLength(bytes []byte, offset int) (int, int, error) {
 	b := bytes[offset]
 	offset++
@@ -484,7 +484,7 @@ func (msg *PKIMessage) parseMessageType() error {
 		}
 		msg.CertRepMessage = cr
 		return nil
-	case PKCSReq, UpdateReq, RenewalReq:
+	case PKCSReq, UpdateReq, RenewalReq, CertPoll:
 		var sn SenderNonce
 		if err := msg.p7.UnmarshalSignedAttribute(oidSCEPsenderNonce, &sn); err != nil {
 			return err
@@ -494,7 +494,7 @@ func (msg *PKIMessage) parseMessageType() error {
 		}
 		msg.SenderNonce = sn
 		return nil
-	case GetCRL, GetCert, CertPoll:
+	case GetCRL, GetCert:
 		return errNotImplemented
 	default:
 		return errUnknownMessageType
@@ -543,7 +543,9 @@ func (msg *PKIMessage) DecryptPKIEnvelope(cert *x509.Certificate, key *rsa.Priva
 		}
 		logKeyVals = append(logKeyVals, "has_challenge", cp != "")
 		return nil
-	case GetCRL, GetCert, CertPoll:
+	case CertPoll:
+		return nil
+	case GetCRL, GetCert:
 		return errNotImplemented
 	default:
 		return errUnknownMessageType
@@ -612,7 +614,65 @@ func (msg *PKIMessage) Fail(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey, 
 	}
 
 	return crepMsg, nil
+}
 
+func (msg *PKIMessage) Pending(crtAuth *x509.Certificate, keyAuth *rsa.PrivateKey) (*PKIMessage, error) {
+	config := pkcs7.SignerInfoConfig{
+		ExtraSignedAttributes: []pkcs7.Attribute{
+			{
+				Type:  oidSCEPtransactionID,
+				Value: msg.TransactionID,
+			},
+			{
+				Type:  oidSCEPpkiStatus,
+				Value: PENDING,
+			},
+			{
+				Type:  oidSCEPmessageType,
+				Value: CertRep,
+			},
+			{
+				Type:  oidSCEPsenderNonce,
+				Value: msg.SenderNonce,
+			},
+			{
+				Type:  oidSCEPrecipientNonce,
+				Value: msg.SenderNonce,
+			},
+		},
+	}
+
+	sd, err := pkcs7.NewSignedData(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	sd.SetDigestAlgorithm(pkcs7.OIDDigestAlgorithmSHA256)
+
+	// sign the attributes
+	if err := sd.AddSigner(crtAuth, keyAuth, config); err != nil {
+		return nil, err
+	}
+
+	certRepBytes, err := sd.Finish()
+	if err != nil {
+		return nil, err
+	}
+
+	cr := &CertRepMessage{
+		PKIStatus:      PENDING,
+		RecipientNonce: RecipientNonce(msg.SenderNonce),
+	}
+
+	// create a CertRep message from the original
+	crepMsg := &PKIMessage{
+		Raw:            certRepBytes,
+		TransactionID:  msg.TransactionID,
+		MessageType:    CertRep,
+		CertRepMessage: cr,
+	}
+
+	return crepMsg, nil
 }
 
 // Success returns a new PKIMessage with CertRep data using an already-issued certificate
