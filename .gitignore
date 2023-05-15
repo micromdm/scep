@@ -1,2 +1,3 @@
-scepserver-*
-scepclient-*
+scepserver*
+scepclient*
+secp-depot

@@ -1,4 +1,4 @@
-module github.com/micromdm/scep/v2
+module github.com/pidpawel/scep/v2
 
 go 1.20
 
