@@ -146,14 +146,11 @@ jobs:
         with:
           path: bin
 
-      - name: Display structure of downloaded files
-        run: ls -R
-
       - name: Fix permissions
-        run: chmod +x -R bin/
+        run: chmod +x -R bin/**/*
 
       - name: Publish Github release
         uses: softprops/action-gh-release@v1
         with:
           fail_on_unmatched_files: true
-          files: bin/*
+          files: bin/**/*
