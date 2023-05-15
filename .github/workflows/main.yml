@@ -127,7 +127,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
-          tags: pidpawel/scep:${{ github.ref_name }}, pidpawel/scep:latest
+          tags: micromdm/scep:${{ github.ref_name }}, micromdm/scep:latest
 
   push-github:
     name: Push to Github releases

@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pidpawel/scep/v2/cryptoutil"
-	"github.com/pidpawel/scep/v2/scep"
+	"github.com/micromdm/scep/v2/cryptoutil"
+	"github.com/micromdm/scep/v2/scep"
 )
 
 // Signer signs x509 certificates and stores them in a Depot
