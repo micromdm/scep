@@ -70,6 +70,7 @@ services:
       - "8080:8080"
     volumes:
       - ./secp-depot:/depot
+    command: -depot /depot -challenge=secret
 ```
 
 ### CSR verifier server addon
@@ -103,6 +104,16 @@ To obtain a certificate through Network Device Enrollment Service (NDES), set `-
 This most likely uses the `/certsrv/mscep` path. You will need to add the `-ca-fingerprint` client argument during this request to specify which CA to use.
 
 If you're not sure which SHA-256 hash (for a specific CA) to use, you can use the `-debug` flag to print them out for the CAs returned from the SCEP server.
+
+#### Client in Docker
+
+In order to use scepclient from Docker image you need to override it's entrypoint. Other arguments are passed as in the server command (this is with no binary name).
+
+**Remember to add a volume if you're working with files!**
+
+```bash
+docker run -it --rm --volume ./client.key:/client.key --entrypoint=scepclient micromdm/scep:latest -private-key /client.key -server-url=http://127.0.0.1:8080/scep -challenge=secret
+```
 
 ### SCEP library
 
