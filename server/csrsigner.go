@@ -5,7 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 
-	"github.com/micromdm/scep/v2/scep"
+	"github.com/pidpawel/scep/v2/scep"
 )
 
 // CSRSigner is a handler for CSR signing by the CA/RA

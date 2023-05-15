@@ -1,7 +1,7 @@
 # scep
 
-[![CI](https://github.com/micromdm/scep/workflows/CI/badge.svg)](https://github.com/micromdm/scep/actions)
-[![Go Reference](https://pkg.go.dev/badge/github.com/micromdm/scep/v2.svg)](https://pkg.go.dev/github.com/micromdm/scep/v2)
+[![CI](https://github.com/pidpawel/scep/workflows/CI/badge.svg)](https://github.com/pidpawel/scep/actions)
+[![Go Reference](https://pkg.go.dev/badge/github.com/pidpawel/scep/v2.svg)](https://pkg.go.dev/github.com/pidpawel/scep/v2)
 
 `scep` is a Simple Certificate Enrollment Protocol server and client.
 
@@ -15,14 +15,14 @@ go install github.com/pidpawel/scep@latest
 
 ### Manual binary install
 
-Binary releases are available on the [releases page](https://github.com/micromdm/scep/releases).
+Binary releases are available on the [releases page](https://github.com/pidpawel/scep/releases).
 
 ### Compilation from source
 
 To compile the SCEP client and server you will need [a Go compiler](https://golang.org/dl/) as well as standard tools like git, etc.
 
 ```bash
-git clone https://github.com/micromdm/scep.git
+git clone https://github.com/pidpawel/scep.git
 cd scep
 go build -o scepclient ./cmd/scepclient/
 go build -o scepserver ./cmd/scepserver/
@@ -31,7 +31,7 @@ go build -o scepserver ./cmd/scepserver/
 ### Building Docker
 
 ```bash
-git clone https://github.com/micromdm/scep.git
+git clone https://github.com/pidpawel/scep.git
 cd scep
 docker build -t micromdm/scep:latest .
 ```
@@ -108,10 +108,10 @@ If you're not sure which SHA-256 hash (for a specific CA) to use, you can use th
 The core `scep` library can be used for both client and server operations.
 
 ```bash
-go get github.com/micromdm/scep/scep
+go get github.com/pidpawel/scep/scep
 ```
 
-For detailed usage, see the [Go Reference](https://pkg.go.dev/github.com/micromdm/scep/v2/scep).
+For detailed usage, see the [Go Reference](https://pkg.go.dev/github.com/pidpawel/scep/v2/scep).
 
 #### Example server
 

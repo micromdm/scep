@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"errors"
 
-	"github.com/micromdm/scep/v2/scep"
-	scepserver "github.com/micromdm/scep/v2/server"
+	"github.com/pidpawel/scep/v2/scep"
+	scepserver "github.com/pidpawel/scep/v2/server"
 )
 
 // CSRVerifier verifies the raw decrypted CSR.
