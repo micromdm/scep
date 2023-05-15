@@ -10,7 +10,8 @@
 ### Using `go`
 
 ```bash
-go install github.com/pidpawel/scep@latest
+go install github.com/pidpawel/scep/v2/cmd/scepclient@latest
+go install github.com/pidpawel/scep/v2/cmd/scepserver@latest
 ```
 
 ### Manual binary install
