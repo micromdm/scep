@@ -15,7 +15,7 @@ func TestGenerateSubjectKeyID(t *testing.T) {
 		pub      crypto.PublicKey
 	}{
 		{"RSA", &rsa.PublicKey{N: big.NewInt(123), E: 65537}},
-		{"ECDSA", &ecdsa.PublicKey{X: big.NewInt(123), Y: big.NewInt(123), Curve: elliptic.P224()}},
+		{"ECDSA", &ecdsa.PublicKey{X: big.NewInt(0), Y: big.NewInt(0), Curve: elliptic.P224()}},
 	} {
 		test := test
 		t.Run(test.testName, func(t *testing.T) {
