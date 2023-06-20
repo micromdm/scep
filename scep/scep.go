@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"encoding/asn1"
 	"encoding/base64"
-	"fmt"
 	"reflect"
 
 	"github.com/micromdm/scep/v2/cryptoutil"
@@ -291,12 +290,12 @@ type CSRReqMessage struct {
 func parseLength(bytes []byte, offset int) (int, int, error) {
 	b := bytes[offset]
 	offset++
-	class := int(b >> 6)
-	isCompound := b&0x20 == 0x20
-	tag := int(b & 0x1f)
-	fmt.Println(class)
-	fmt.Println(isCompound)
-	fmt.Println(tag)
+	// class := int(b >> 6)
+	// isCompound := b&0x20 == 0x20
+	// tag := int(b & 0x1f)
+	// fmt.Println(class)
+	// fmt.Println(isCompound)
+	// fmt.Println(tag)
 
 	b = bytes[offset]
 	offset++
