@@ -147,9 +147,9 @@ func main() {
 		if *flSignServerAttrs {
 			signerOpts = append(signerOpts, scepdepot.WithSeverAttrs())
 		}
-		var signer scepserver.CSRSigner = scepdepot.NewSigner(depot, signerOpts...)
+		var signer scepserver.CSRSignerContext = scepserver.SignCSRAdapter(scepdepot.NewSigner(depot, signerOpts...))
 		if *flChallengePassword != "" {
-			signer = scepserver.ChallengeMiddleware(*flChallengePassword, signer)
+			signer = scepserver.StaticChallengeMiddleware(*flChallengePassword, signer)
 		}
 		if csrVerifier != nil {
 			signer = csrverifier.Middleware(csrVerifier, signer)
