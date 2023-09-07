@@ -131,6 +131,12 @@ func TestCaCert(t *testing.T) {
 			t.Error("no established chain between issued cert and CA")
 		}
 
+		if csr.SignatureAlgorithm != respCert.SignatureAlgorithm {
+			t.Fatal(fmt.Errorf("cert signature algo %s different from csr signature algo %s",
+				csr.SignatureAlgorithm.String(),
+				respCert.SignatureAlgorithm.String()))
+		}
+
 		// verify unique certificate serials
 		for _, ser := range serCollector {
 			if respCert.SerialNumber.Cmp(ser) == 0 {
