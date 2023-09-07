@@ -21,7 +21,6 @@ type Signer struct {
 	signatureAlgo    x509.SignatureAlgorithm
 }
 
-
 // Option customizes Signer
 type Option func(*Signer)
 
@@ -31,7 +30,7 @@ func NewSigner(depot Depot, opts ...Option) *Signer {
 		depot:            depot,
 		allowRenewalDays: 14,
 		validityDays:     365,
-		signatureAlgo:	  0,
+		signatureAlgo:    0,
 	}
 	for _, opt := range opts {
 		opt(s)
