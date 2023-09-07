@@ -89,7 +89,7 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		return nil, err
 	}
 
-	signatureAlgo := m.CSR.SignatureAlgorithm
+	var signatureAlgo x509.SignatureAlgorithm
 	if s.signatureAlgo != 0 {
 		signatureAlgo = s.signatureAlgo
 	}
