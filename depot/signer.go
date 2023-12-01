@@ -18,6 +18,7 @@ type Signer struct {
 	allowRenewalDays int
 	validityDays     int
 	serverAttrs      bool
+	signatureAlgo    x509.SignatureAlgorithm
 }
 
 // Option customizes Signer
@@ -29,11 +30,21 @@ func NewSigner(depot Depot, opts ...Option) *Signer {
 		depot:            depot,
 		allowRenewalDays: 14,
 		validityDays:     365,
+		signatureAlgo:    0,
 	}
 	for _, opt := range opts {
 		opt(s)
 	}
 	return s
+}
+
+// WithSignatureAlgorithm sets the signature algorithm to be used to sign certificates.
+// When set to a non-zero value, this would take preference over the default behaviour of
+// matching the signing algorithm from the x509 CSR.
+func WithSignatureAlgorithm(a x509.SignatureAlgorithm) Option {
+	return func(s *Signer) {
+		s.signatureAlgo = a
+	}
 }
 
 // WithCAPass specifies the password to use with an encrypted CA key
@@ -78,6 +89,11 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		return nil, err
 	}
 
+	var signatureAlgo x509.SignatureAlgorithm
+	if s.signatureAlgo != 0 {
+		signatureAlgo = s.signatureAlgo
+	}
+
 	// create cert template
 	tmpl := &x509.Certificate{
 		SerialNumber: serial,
@@ -89,7 +105,7 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageClientAuth,
 		},
-		SignatureAlgorithm: m.CSR.SignatureAlgorithm,
+		SignatureAlgorithm: signatureAlgo,
 		DNSNames:           m.CSR.DNSNames,
 		EmailAddresses:     m.CSR.EmailAddresses,
 		IPAddresses:        m.CSR.IPAddresses,
