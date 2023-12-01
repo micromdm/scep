@@ -3,7 +3,6 @@ package depot
 import (
 	"crypto/rand"
 	"crypto/x509"
-	"sync"
 	"time"
 
 	"github.com/micromdm/scep/v2/cryptoutil"
@@ -13,7 +12,6 @@ import (
 // Signer signs x509 certificates and stores them in a Depot
 type Signer struct {
 	depot            Depot
-	mu               sync.Mutex
 	caPass           string
 	allowRenewalDays int
 	validityDays     int
@@ -80,9 +78,6 @@ func (s *Signer) SignCSR(m *scep.CSRReqMessage) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	serial, err := s.depot.Serial()
 	if err != nil {
