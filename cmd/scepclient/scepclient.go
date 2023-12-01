@@ -253,36 +253,7 @@ func validateFingerprint(fingerprint string) (hash []byte, err error) {
 	return
 }
 
-var (
-	flVersion           = flag.Bool("version", false, "prints version information")
-	flServerURL         = flag.String("server-url", "", "SCEP server url")
-	flChallengePassword = flag.String("challenge", "", "enforce a challenge password")
-	flPKeyPath          = flag.String("private-key", "", "private key path, if there is no key, scepclient will create one")
-	flCertPath          = flag.String("certificate", "", "certificate path, if there is no key, scepclient will create one")
-	flKeySize           = flag.Int("keySize", 2048, "rsa key size")
-	flOrg               = flag.String("organization", "scep-client", "organization for cert")
-	flCName             = flag.String("cn", "scepclient", "common name for certificate")
-	flOU                = flag.String("ou", "MDM", "organizational unit for certificate")
-	flLoc               = flag.String("locality", "", "locality for certificate")
-	flProvince          = flag.String("province", "", "province for certificate")
-	flCountry           = flag.String("country", "US", "country code in certificate")
-	flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
-	flDNSName           = flag.String("dnsname", "", "DNS name to be included in the certificate (SAN)")
-
-	// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
-	// data is.
-	flCAFingerprint           = flag.String("ca-fingerprint", "", "SHA-256 digest of CA certificate for NDES server. Note: Changed from MD5.")
-	flKeyEnciphermentSelector = flag.Bool("key-encipherment-selector", false, "Filter CA certificates by key encipherment usage")
-
-	flDebugLogging = flag.Bool("debug", false, "enable debug logging")
-	flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
-)
-
-func validateFlags() error {
-	keyPath := *flPKeyPath
-	serverURL := *flServerURL
-	caFingerprint := *flCAFingerprint
-	useKeyEnciphermentSelector := *flKeyEnciphermentSelector
+func validateFlags(keyPath, serverURL, caFingerprint string, useKeyEnciphermentSelector bool) error {
 	if keyPath == "" {
 		return errors.New("must specify private key path")
 	}
@@ -300,6 +271,31 @@ func validateFlags() error {
 }
 
 func main() {
+	var (
+		flVersion           = flag.Bool("version", false, "prints version information")
+		flServerURL         = flag.String("server-url", "", "SCEP server url")
+		flChallengePassword = flag.String("challenge", "", "enforce a challenge password")
+		flPKeyPath          = flag.String("private-key", "", "private key path, if there is no key, scepclient will create one")
+		flCertPath          = flag.String("certificate", "", "certificate path, if there is no key, scepclient will create one")
+		flKeySize           = flag.Int("keySize", 2048, "rsa key size")
+		flOrg               = flag.String("organization", "scep-client", "organization for cert")
+		flCName             = flag.String("cn", "scepclient", "common name for certificate")
+		flOU                = flag.String("ou", "MDM", "organizational unit for certificate")
+		flLoc               = flag.String("locality", "", "locality for certificate")
+		flProvince          = flag.String("province", "", "province for certificate")
+		flCountry           = flag.String("country", "US", "country code in certificate")
+		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
+		flDNSName           = flag.String("dnsname", "", "DNS name to be included in the certificate (SAN)")
+
+		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
+		// data is. This can be done using either the CA fingerprint, or based on the key usage encoded in the
+		// certificates returned by the authority.
+		flCAFingerprint           = flag.String("ca-fingerprint", "", "SHA-256 digest of CA certificate for NDES server. Note: Changed from MD5.")
+		flKeyEnciphermentSelector = flag.Bool("key-encipherment-selector", false, "Filter CA certificates by key encipherment usage")
+
+		flDebugLogging = flag.Bool("debug", false, "enable debug logging")
+		flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
+	)
 
 	flag.Parse()
 
@@ -309,21 +305,21 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := validateFlags(); err != nil {
+	if err := validateFlags(*flPKeyPath, *flServerURL, *flCAFingerprint, *flKeyEnciphermentSelector); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	caCertsSelector := scep.NopCertsSelector()
-	if *flCAFingerprint != "" {
+	switch {
+	case *flCAFingerprint != "":
 		hash, err := validateFingerprint(*flCAFingerprint)
 		if err != nil {
 			fmt.Printf("invalid fingerprint: %s\n", err)
 			os.Exit(1)
 		}
 		caCertsSelector = scep.FingerprintCertsSelector(fingerprintHashType, hash)
-	}
-	if *flKeyEnciphermentSelector {
+	case *flKeyEnciphermentSelector:
 		caCertsSelector = scep.EnciphermentCertsSelector()
 	}
 
