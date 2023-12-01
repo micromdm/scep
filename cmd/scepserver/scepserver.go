@@ -43,7 +43,8 @@ func main() {
 	//main flags
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
-		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "port to listen on")
+		flHTTPAddr          = flag.String("http-addr", envString("SCEP_HTTP_ADDR", ""), "http listen address. defaults to \":8080\"")
+		flPort              = flag.String("port", envString("SCEP_HTTP_LISTEN_PORT", "8080"), "http port to listen on (if you want to specify an address, use -http-addr instead)")
 		flDepotPath         = flag.String("depot", envString("SCEP_FILE_DEPOT", "depot"), "path to ca folder")
 		flCAPass            = flag.String("capass", envString("SCEP_CA_PASS", ""), "passwd for the ca.key")
 		flClDuration        = flag.String("crtvalid", envString("SCEP_CERT_VALID", "365"), "validity for new client certificates in days")
@@ -52,6 +53,7 @@ func main() {
 		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
+		flSignServerAttrs   = flag.Bool("sign-server-attrs", envBool("SCEP_SIGN_SERVER_ATTRS"), "sign cert attrs for server usage")
 	)
 	flag.Usage = func() {
 		flag.PrintDefaults()
@@ -67,7 +69,19 @@ func main() {
 		fmt.Println(version)
 		os.Exit(0)
 	}
-	port := ":" + *flPort
+
+	// -http-addr and -port conflict. Don't allow the user to set both.
+	httpAddrSet := setByUser("http-addr", "SCEP_HTTP_ADDR")
+	portSet := setByUser("port", "SCEP_HTTP_LISTEN_PORT")
+	var httpAddr string
+	if httpAddrSet && portSet {
+		fmt.Fprintln(os.Stderr, "cannot set both -http-addr and -port")
+		os.Exit(1)
+	} else if httpAddrSet {
+		httpAddr = *flHTTPAddr
+	} else {
+		httpAddr = ":" + *flPort
+	}
 
 	var logger log.Logger
 	{
@@ -125,14 +139,17 @@ func main() {
 			lginfo.Log("err", "missing CA certificate")
 			os.Exit(1)
 		}
-		var signer scepserver.CSRSigner = scepdepot.NewSigner(
-			depot,
+		signerOpts := []scepdepot.Option{
 			scepdepot.WithAllowRenewalDays(allowRenewal),
 			scepdepot.WithValidityDays(clientValidity),
 			scepdepot.WithCAPass(*flCAPass),
-		)
+		}
+		if *flSignServerAttrs {
+			signerOpts = append(signerOpts, scepdepot.WithSeverAttrs())
+		}
+		var signer scepserver.CSRSignerContext = scepserver.SignCSRAdapter(scepdepot.NewSigner(depot, signerOpts...))
 		if *flChallengePassword != "" {
-			signer = scepserver.ChallengeMiddleware(*flChallengePassword, signer)
+			signer = scepserver.StaticChallengeMiddleware(*flChallengePassword, signer)
 		}
 		if csrVerifier != nil {
 			signer = csrverifier.Middleware(csrVerifier, signer)
@@ -156,8 +173,8 @@ func main() {
 	// start http server
 	errs := make(chan error, 2)
 	go func() {
-		lginfo.Log("transport", "http", "address", port, "msg", "listening")
-		errs <- http.ListenAndServe(port, h)
+		lginfo.Log("transport", "http", "address", httpAddr, "msg", "listening")
+		errs <- http.ListenAndServe(httpAddr, h)
 	}()
 	go func() {
 		c := make(chan os.Signal)
@@ -170,14 +187,15 @@ func main() {
 
 func caMain(cmd *flag.FlagSet) int {
 	var (
-		flDepotPath = cmd.String("depot", "depot", "path to ca folder")
-		flInit      = cmd.Bool("init", false, "create a new CA")
-		flYears     = cmd.Int("years", 10, "default CA years")
-		flKeySize   = cmd.Int("keySize", 4096, "rsa key size")
-		flOrg       = cmd.String("organization", "scep-ca", "organization for CA cert")
-		flOrgUnit   = cmd.String("organizational_unit", "SCEP CA", "organizational unit (OU) for CA cert")
-		flPassword  = cmd.String("key-password", "", "password to store rsa key")
-		flCountry   = cmd.String("country", "US", "country for CA cert")
+		flDepotPath  = cmd.String("depot", "depot", "path to ca folder")
+		flInit       = cmd.Bool("init", false, "create a new CA")
+		flYears      = cmd.Int("years", 10, "default CA years")
+		flKeySize    = cmd.Int("keySize", 4096, "rsa key size")
+		flCommonName = cmd.String("common_name", "MICROMDM SCEP CA", "common name (CN) for CA cert")
+		flOrg        = cmd.String("organization", "scep-ca", "organization for CA cert")
+		flOrgUnit    = cmd.String("organizational_unit", "SCEP CA", "organizational unit (OU) for CA cert")
+		flPassword   = cmd.String("key-password", "", "password to store rsa key")
+		flCountry    = cmd.String("country", "US", "country for CA cert")
 	)
 	cmd.Parse(os.Args[2:])
 	if *flInit {
@@ -187,7 +205,7 @@ func caMain(cmd *flag.FlagSet) int {
 			fmt.Println(err)
 			return 1
 		}
-		if err := createCertificateAuthority(key, *flYears, *flOrg, *flOrgUnit, *flCountry, *flDepotPath); err != nil {
+		if err := createCertificateAuthority(key, *flYears, *flCommonName, *flOrg, *flOrgUnit, *flCountry, *flDepotPath); err != nil {
 			fmt.Println(err)
 			return 1
 		}
@@ -232,9 +250,10 @@ func createKey(bits int, password []byte, depot string) (*rsa.PrivateKey, error)
 	return key, nil
 }
 
-func createCertificateAuthority(key *rsa.PrivateKey, years int, organization string, organizationalUnit string, country string, depot string) error {
+func createCertificateAuthority(key *rsa.PrivateKey, years int, commonName string, organization string, organizationalUnit string, country string, depot string) error {
 	cert := scepdepot.NewCACert(
 		scepdepot.WithYears(years),
+		scepdepot.WithCommonName(commonName),
 		scepdepot.WithOrganization(organization),
 		scepdepot.WithOrganizationalUnit(organizationalUnit),
 		scepdepot.WithCountry(country),
@@ -287,4 +306,14 @@ func envBool(key string) bool {
 		return true
 	}
 	return false
+}
+
+func setByUser(flagName, envName string) bool {
+	userDefinedFlags := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		userDefinedFlags[f.Name] = true
+	})
+	flagSet := userDefinedFlags[flagName]
+	_, envSet := os.LookupEnv(envName)
+	return flagSet || envSet
 }

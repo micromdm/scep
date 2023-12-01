@@ -46,7 +46,7 @@ func TestCaCert(t *testing.T) {
 	caCert := certs[0]
 
 	// SCEP service
-	svc, err := scepserver.NewService(caCert, key, scepdepot.NewSigner(depot))
+	svc, err := scepserver.NewService(caCert, key, scepserver.SignCSRAdapter(scepdepot.NewSigner(depot)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,6 +129,12 @@ func TestCaCert(t *testing.T) {
 		}
 		if len(chains) < 1 {
 			t.Error("no established chain between issued cert and CA")
+		}
+
+		if csr.SignatureAlgorithm != respCert.SignatureAlgorithm {
+			t.Fatal(fmt.Errorf("cert signature algo %s different from csr signature algo %s",
+				csr.SignatureAlgorithm.String(),
+				respCert.SignatureAlgorithm.String()))
 		}
 
 		// verify unique certificate serials

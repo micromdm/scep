@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -31,7 +32,9 @@ func NewFileDepot(path string) (*fileDepot, error) {
 }
 
 type fileDepot struct {
-	dirPath string
+	dirPath  string
+	serialMu sync.Mutex
+	dbMu     sync.Mutex
 }
 
 func (d *fileDepot) CA(pass []byte) ([]*x509.Certificate, *rsa.PrivateKey, error) {
@@ -75,10 +78,7 @@ func (d *fileDepot) Put(cn string, crt *x509.Certificate) error {
 		return err
 	}
 
-	serial, err := d.Serial()
-	if err != nil {
-		return err
-	}
+	serial := crt.SerialNumber
 
 	if crt.Subject.CommonName == "" {
 		// this means our cn was replaced by the certificate Signature
@@ -103,14 +103,12 @@ func (d *fileDepot) Put(cn string, crt *x509.Certificate) error {
 		return err
 	}
 
-	if err := d.incrementSerial(serial); err != nil {
-		return err
-	}
-
 	return nil
 }
 
 func (d *fileDepot) Serial() (*big.Int, error) {
+	d.serialMu.Lock()
+	defer d.serialMu.Unlock()
 	name := d.path("serial")
 	s := big.NewInt(2)
 	if err := d.check("serial"); err != nil {
@@ -135,6 +133,9 @@ func (d *fileDepot) Serial() (*big.Int, error) {
 	serial, ok := s.SetString(data, 16)
 	if !ok {
 		return nil, errors.New("could not convert " + string(data) + " to serial number")
+	}
+	if err := d.incrementSerial(serial); err != nil {
+		return serial, err
 	}
 	return serial, nil
 }
@@ -255,6 +256,8 @@ func (d *fileDepot) HasCN(_ string, allowTime int, cert *x509.Certificate, revok
 }
 
 func (d *fileDepot) writeDB(cn string, serial *big.Int, filename string, cert *x509.Certificate) error {
+	d.dbMu.Lock()
+	defer d.dbMu.Unlock()
 
 	var dbEntry bytes.Buffer
 
@@ -365,8 +368,9 @@ func (d *fileDepot) path(name string) string {
 }
 
 const (
-	rsaPrivateKeyPEMBlockType = "RSA PRIVATE KEY"
-	certificatePEMBlockType   = "CERTIFICATE"
+	rsaPrivateKeyPEMBlockType   = "RSA PRIVATE KEY"
+	pkcs8PrivateKeyPEMBlockType = "PRIVATE KEY"
+	certificatePEMBlockType     = "CERTIFICATE"
 )
 
 // load an encrypted private key from disk
@@ -375,15 +379,33 @@ func loadKey(data []byte, password []byte) (*rsa.PrivateKey, error) {
 	if pemBlock == nil {
 		return nil, errors.New("PEM decode failed")
 	}
-	if pemBlock.Type != rsaPrivateKeyPEMBlockType {
+	switch pemBlock.Type {
+	case rsaPrivateKeyPEMBlockType:
+		if x509.IsEncryptedPEMBlock(pemBlock) {
+			b, err := x509.DecryptPEMBlock(pemBlock, password)
+			if err != nil {
+				return nil, err
+			}
+			return x509.ParsePKCS1PrivateKey(b)
+		}
+		return x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
+	case pkcs8PrivateKeyPEMBlockType:
+		priv, err := x509.ParsePKCS8PrivateKey(pemBlock.Bytes)
+		if err != nil {
+			return nil, err
+		}
+		switch priv := priv.(type) {
+		case *rsa.PrivateKey:
+			return priv, nil
+		// case *dsa.PublicKey:
+		// case *ecdsa.PublicKey:
+		// case ed25519.PublicKey:
+		default:
+			panic("unsupported type of public key. SCEP need RSA private key")
+		}
+	default:
 		return nil, errors.New("unmatched type or headers")
 	}
-
-	b, err := x509.DecryptPEMBlock(pemBlock, password)
-	if err != nil {
-		return nil, err
-	}
-	return x509.ParsePKCS1PrivateKey(b)
 }
 
 // load an encrypted private key from disk

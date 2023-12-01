@@ -1,6 +1,7 @@
 package scepserver
 
 import (
+	"context"
 	"testing"
 
 	"github.com/micromdm/scep/v2/scep"
@@ -8,18 +9,20 @@ import (
 
 func TestChallengeMiddleware(t *testing.T) {
 	testPW := "RIGHT"
-	signer := ChallengeMiddleware(testPW, NopCSRSigner())
+	signer := StaticChallengeMiddleware(testPW, NopCSRSigner())
 
 	csrReq := &scep.CSRReqMessage{ChallengePassword: testPW}
 
-	_, err := signer.SignCSR(csrReq)
+	ctx := context.Background()
+
+	_, err := signer.SignCSRContext(ctx, csrReq)
 	if err != nil {
 		t.Error(err)
 	}
 
 	csrReq.ChallengePassword = "WRONG"
 
-	_, err = signer.SignCSR(csrReq)
+	_, err = signer.SignCSRContext(ctx, csrReq)
 	if err == nil {
 		t.Error("invalid challenge should generate an error")
 	}

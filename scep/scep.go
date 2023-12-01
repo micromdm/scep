@@ -18,7 +18,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
 )
 
 // errors
@@ -85,7 +85,6 @@ const (
 // reasons:
 type FailInfo string
 
-//
 const (
 	BadAlg          FailInfo = "0"
 	BadMessageCheck          = "1"

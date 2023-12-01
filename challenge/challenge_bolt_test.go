@@ -1,6 +1,7 @@
 package challenge
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"testing"
@@ -69,12 +70,14 @@ func TestDynamicChallenge(t *testing.T) {
 		ChallengePassword: challengePassword,
 	}
 
-	_, err = signer.SignCSR(csrReq)
+	ctx := context.Background()
+
+	_, err = signer.SignCSRContext(ctx, csrReq)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err = signer.SignCSR(csrReq)
+	_, err = signer.SignCSRContext(ctx, csrReq)
 	if err == nil {
 		t.Error("challenge should not be valid twice")
 	}
