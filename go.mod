@@ -1,6 +1,6 @@
 module github.com/micromdm/scep/v2
 
-go 1.17
+go 1.18
 
 require (
 	github.com/boltdb/bolt v1.3.1
