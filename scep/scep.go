@@ -18,7 +18,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
-	"go.mozilla.org/pkcs7"
+	"github.com/smallstep/pkcs7"
 )
 
 // errors
@@ -163,8 +163,8 @@ func WithCertsSelector(selector CertsSelector) Option {
 }
 
 // WithDigestAlgorithm sets the PKCS #7 digest algorithm. Note that
-//in go versions >=1.18 setting the algo as SHA1 will cause x509
-//verify function to failed due to unsecure algo.
+// in go versions >=1.18 setting the algo as SHA1 will cause x509
+// verify function to failed due to unsecure algo.
 // This option is effective when used with NewCSRRequest function. In
 // this case, the PKCS #7 digest algo will be set to the specified value
 func WithDigestAlgorithm(identifier asn1.ObjectIdentifier) Option {
