@@ -191,7 +191,7 @@ func caMain(cmd *flag.FlagSet) int {
 		flInit       = cmd.Bool("init", false, "create a new CA")
 		flYears      = cmd.Int("years", 10, "default CA years")
 		flKeySize    = cmd.Int("keySize", 4096, "rsa key size")
-		flCommonName = cmd.String("common_name", "MICROMDM SCEP CA", "common name (CN) for CA cert")
+		flCommonName = cmd.String("common_name", "PUNON SCEP CA", "common name (CN) for CA cert")
 		flOrg        = cmd.String("organization", "scep-ca", "organization for CA cert")
 		flOrgUnit    = cmd.String("organizational_unit", "SCEP CA", "organizational unit (OU) for CA cert")
 		flPassword   = cmd.String("key-password", "", "password to store rsa key")
