@@ -17,10 +17,10 @@ import (
 	challengestore "github.com/micromdm/scep/v2/challenge/bolt"
 	scepdepot "github.com/micromdm/scep/v2/depot"
 	boltdepot "github.com/micromdm/scep/v2/depot/bolt"
-	"github.com/micromdm/scep/v2/scep"
 	scepserver "github.com/micromdm/scep/v2/server"
 
 	"github.com/boltdb/bolt"
+	"github.com/smallstep/scep"
 )
 
 func TestCaCert(t *testing.T) {

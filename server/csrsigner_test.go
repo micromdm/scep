@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/micromdm/scep/v2/scep"
+	"github.com/smallstep/scep"
 )
 
 func TestChallengeMiddleware(t *testing.T) {
