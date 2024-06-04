@@ -175,58 +175,6 @@ docker run -it --rm -v /path/to/ca/folder:/depot micromdm/scep:latest ca -init
 docker run -it --rm -v /path/to/ca/folder:/depot -p 8080:8080 micromdm/scep:latest
 ```
 
-## SCEP library
-
-The core `scep` library can be used for both client and server operations.
-
-```
-go get github.com/micromdm/scep/scep
-```
-
-For detailed usage, see the [Go Reference](https://pkg.go.dev/github.com/micromdm/scep/v2/scep).
-
-Example (server):
-
-```go
-// read a request body containing SCEP message
-body, err := ioutil.ReadAll(r.Body)
-if err != nil {
-    // handle err
-}
-
-// parse the SCEP message
-msg, err := scep.ParsePKIMessage(body)
-if err != nil {
-    // handle err
-}
-
-// do something with msg
-fmt.Println(msg.MessageType)
-
-// extract encrypted pkiEnvelope
-err := msg.DecryptPKIEnvelope(CAcert, CAkey)
-if err != nil {
-    // handle err
-}
-
-// use the CSR from decrypted PKCS request and sign
-// MyCSRSigner returns an *x509.Certificate here
-crt, err := MyCSRSigner(msg.CSRReqMessage.CSR)
-if err != nil {
-    // handle err
-}
-
-// create a CertRep message from the original
-certRep, err := msg.Success(CAcert, CAkey, crt)
-if err != nil {
-    // handle err
-}
-
-// send response back
-// w is a http.ResponseWriter
-w.Write(certRep.Raw)
-```
-
 ## Server library
 
 You can import the scep endpoint into another Go project. For an example take a look at [scepserver.go](cmd/scepserver/scepserver.go).
