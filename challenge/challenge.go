@@ -10,14 +10,21 @@ import (
 	scepserver "github.com/micromdm/scep/v2/server"
 )
 
-// Store is a dynamic challenge password cache.
-type Store interface {
-	SCEPChallenge() (string, error)
+// Validator validates challenge passwords.
+type Validator interface {
+	// HasChallenge validates pw as valid.
 	HasChallenge(pw string) (bool, error)
 }
 
-// Middleware wraps next in a CSRSigner that verifies and invalidates the challenge
-func Middleware(store Store, next scepserver.CSRSignerContext) scepserver.CSRSignerContextFunc {
+// Store is a dynamic challenge password cache.
+type Store interface {
+	// SCEPChallenge generates a new challenge password.
+	SCEPChallenge() (string, error)
+	Validator
+}
+
+// Middleware wraps next in a CSRSigner that verifies and invalidates the challenge.
+func Middleware(store Validator, next scepserver.CSRSignerContext) scepserver.CSRSignerContextFunc {
 	return func(ctx context.Context, m *scep.CSRReqMessage) (*x509.Certificate, error) {
 		// TODO: compare challenge only for PKCSReq?
 		valid, err := store.HasChallenge(m.ChallengePassword)
