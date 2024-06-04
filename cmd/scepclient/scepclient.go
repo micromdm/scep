@@ -17,11 +17,11 @@ import (
 	"time"
 
 	scepclient "github.com/micromdm/scep/v2/client"
-	"github.com/micromdm/scep/v2/scep"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"github.com/smallstep/scep"
 )
 
 // version info

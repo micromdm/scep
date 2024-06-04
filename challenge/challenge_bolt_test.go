@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	challengestore "github.com/micromdm/scep/v2/challenge/bolt"
-	"github.com/micromdm/scep/v2/scep"
 	scepserver "github.com/micromdm/scep/v2/server"
 
 	"github.com/boltdb/bolt"
+	"github.com/smallstep/scep"
 )
 
 func TestDynamicChallenge(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 
-	"github.com/micromdm/scep/v2/scep"
+	"github.com/smallstep/scep"
 )
 
 // CSRSignerContext is a handler for signing CSRs by a CA/RA.

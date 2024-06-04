@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/micromdm/scep/v2/cryptoutil"
-	"github.com/micromdm/scep/v2/scep"
+	"github.com/smallstep/scep"
 )
 
 // Signer signs x509 certificates and stores them in a Depot
