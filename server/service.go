@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/asn1"
 	"errors"
 
 	"github.com/micromdm/scep/v2/scep"
@@ -51,6 +52,9 @@ type service struct {
 
 	/// info logging is implemented in the service middleware layer.
 	debugLogger log.Logger
+
+	//disgest algo
+	digestAlgo asn1.ObjectIdentifier
 }
 
 func (svc *service) GetCACaps(ctx context.Context) ([]byte, error) {
@@ -86,11 +90,11 @@ func (svc *service) PKIOperation(ctx context.Context, data []byte) ([]byte, erro
 	}
 	if err != nil {
 		svc.debugLogger.Log("msg", "failed to sign CSR", "err", err)
-		certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest)
+		certRep, err := msg.Fail(svc.crt, svc.key, scep.BadRequest, svc.digestAlgo)
 		return certRep.Raw, err
 	}
 
-	certRep, err := msg.Success(svc.crt, svc.key, crt)
+	certRep, err := msg.Success(svc.crt, svc.key, crt, svc.digestAlgo)
 	return certRep.Raw, err
 }
 
@@ -106,6 +110,13 @@ type ServiceOption func(*service) error
 func WithLogger(logger log.Logger) ServiceOption {
 	return func(s *service) error {
 		s.debugLogger = logger
+		return nil
+	}
+}
+
+func WithDigestAlgo(identifier asn1.ObjectIdentifier) ServiceOption {
+	return func(s *service) error {
+		s.digestAlgo = identifier
 		return nil
 	}
 }

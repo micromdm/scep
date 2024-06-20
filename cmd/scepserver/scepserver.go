@@ -4,14 +4,18 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
+	"github.com/smallstep/pkcs7"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/micromdm/scep/v2/csrverifier"
@@ -29,6 +33,19 @@ var (
 	version = "unknown"
 )
 
+var digestStringOIMap = map[string]asn1.ObjectIdentifier{
+	"SHA1":        pkcs7.OIDDigestAlgorithmSHA1,
+	"SHA256":      pkcs7.OIDDigestAlgorithmSHA256,
+	"SHA384":      pkcs7.OIDDigestAlgorithmSHA384,
+	"SHA512":      pkcs7.OIDDigestAlgorithmSHA512,
+	"DSA":         pkcs7.OIDDigestAlgorithmDSA,
+	"DSASHA1":     pkcs7.OIDDigestAlgorithmDSASHA1,
+	"ECDSASHA1":   pkcs7.OIDDigestAlgorithmECDSASHA1,
+	"ECDSASHA256": pkcs7.OIDDigestAlgorithmECDSASHA256,
+	"ECDSASHA384": pkcs7.OIDDigestAlgorithmECDSASHA384,
+	"ECDSASHA512": pkcs7.OIDDigestAlgorithmECDSASHA512,
+}
+
 func main() {
 	var caCMD = flag.NewFlagSet("ca", flag.ExitOnError)
 	{
@@ -40,7 +57,6 @@ func main() {
 		}
 	}
 
-	//main flags
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
 		flHTTPAddr          = flag.String("http-addr", envString("SCEP_HTTP_ADDR", ""), "http listen address. defaults to \":8080\"")
@@ -51,6 +67,7 @@ func main() {
 		flClAllowRenewal    = flag.String("allowrenew", envString("SCEP_CERT_RENEW", "14"), "do not allow renewal until n days before expiry, set to 0 to always allow")
 		flChallengePassword = flag.String("challenge", envString("SCEP_CHALLENGE_PASSWORD", ""), "enforce a challenge password")
 		flCSRVerifierExec   = flag.String("csrverifierexec", envString("SCEP_CSR_VERIFIER_EXEC", ""), "will be passed the CSRs for verification")
+		flDigestAlgo        = flag.String("digest-algo", envString("SCEP_DIGEST_ALGO", "SHA256"), "digest algorithm for pkcs7")
 		flDebug             = flag.Bool("debug", envBool("SCEP_LOG_DEBUG"), "enable debug logging")
 		flLogJSON           = flag.Bool("log-json", envBool("SCEP_LOG_JSON"), "output JSON logs")
 		flSignServerAttrs   = flag.Bool("sign-server-attrs", envBool("SCEP_SIGN_SERVER_ATTRS"), "sign cert attrs for server usage")
@@ -81,6 +98,17 @@ func main() {
 		httpAddr = *flHTTPAddr
 	} else {
 		httpAddr = ":" + *flPort
+	}
+
+	var digestAlgo asn1.ObjectIdentifier
+	digestSet := setByUser("digest-algo", "SCEP_DIGEST_ALGO")
+	if digestSet {
+		d, err := parseUserDefinedDigestAlgo(*flDigestAlgo)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+			os.Exit(1)
+		}
+		digestAlgo = d
 	}
 
 	var logger log.Logger
@@ -154,7 +182,7 @@ func main() {
 		if csrVerifier != nil {
 			signer = csrverifier.Middleware(csrVerifier, signer)
 		}
-		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger))
+		svc, err = scepserver.NewService(crts[0], key, signer, scepserver.WithLogger(logger), scepserver.WithDigestAlgo(digestAlgo))
 		if err != nil {
 			lginfo.Log("err", err)
 			os.Exit(1)
@@ -316,4 +344,15 @@ func setByUser(flagName, envName string) bool {
 	flagSet := userDefinedFlags[flagName]
 	_, envSet := os.LookupEnv(envName)
 	return flagSet || envSet
+}
+
+func parseUserDefinedDigestAlgo(s string) (asn1.ObjectIdentifier, error) {
+	if s == "" {
+		//no value is fine, it will default to SHA256
+		return nil, nil
+	}
+	if v, ok := digestStringOIMap[strings.ToUpper(s)]; ok {
+		return v, nil
+	}
+	return nil, errors.New("invalid value for digest algo")
 }
