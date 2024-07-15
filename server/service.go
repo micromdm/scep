@@ -6,9 +6,8 @@ import (
 	"crypto/x509"
 	"errors"
 
-	"github.com/micromdm/scep/v2/scep"
-
 	"github.com/go-kit/kit/log"
+	"github.com/smallstep/scep"
 )
 
 // Service is the interface for all supported SCEP server operations.
