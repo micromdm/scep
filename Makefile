@@ -50,4 +50,4 @@ test:
 test-race:
 	go test -cover -race ./...
 
-.PHONY: my mywin docker $(SCEPCLIENT) $(SCEPSERVER) release clean test test-race
+.PHONY: my win docker $(SCEPCLIENT) $(SCEPSERVER) release clean test test-race
