@@ -163,7 +163,7 @@ If you're not sure which SHA-256 hash (for a specific CA) to use, you can use th
 
 ```sh
 # first compile the Docker binaries
-make docker
+CGO_ENABLED=0 make docker
 
 # build the image
 docker build -t micromdm/scep:latest .
