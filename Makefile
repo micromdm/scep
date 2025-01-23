@@ -20,7 +20,7 @@ SCEPSERVER=\
 
 my: scepclient-$(OSARCH) scepserver-$(OSARCH)
 
-win: scepclient-$(OSARCH).exe scepserver-$(OSARCH).exe
+win: scepclient-windows-amd64.exe scepserver-windows-amd64.exe
 
 docker: scepclient-linux-amd64 scepserver-linux-amd64
 
