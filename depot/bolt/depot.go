@@ -12,11 +12,11 @@ import (
 
 	"github.com/micromdm/scep/v2/depot"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 )
 
 // Depot implements a SCEP certifiacte store using boltdb.
-// https://github.com/boltdb/bolt
+// https://go.etcd.io/bbolt
 type Depot struct {
 	*bolt.DB
 	serialMu sync.RWMutex
