@@ -9,7 +9,7 @@ import (
 	challengestore "github.com/micromdm/scep/v2/challenge/bolt"
 	scepserver "github.com/micromdm/scep/v2/server"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 	"github.com/smallstep/scep"
 )
 

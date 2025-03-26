@@ -19,7 +19,7 @@ import (
 	boltdepot "github.com/micromdm/scep/v2/depot/bolt"
 	scepserver "github.com/micromdm/scep/v2/server"
 
-	"github.com/boltdb/bolt"
+	bolt "go.etcd.io/bbolt"
 	"github.com/smallstep/scep"
 )
 
