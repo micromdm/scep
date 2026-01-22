@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io/ioutil"
+	"net"
 	"os"
 
 	"github.com/micromdm/scep/v2/cryptoutil/x509util"
@@ -18,8 +19,10 @@ const (
 )
 
 type csrOptions struct {
-	cn, org, country, ou, locality, province, dnsName, challenge string
-	key                                                          *rsa.PrivateKey
+	cn, org, country, ou, locality, province, challenge string
+	dnsNames                                            []string
+	ipAddresses                                         []string
+	key                                                 *rsa.PrivateKey
 }
 
 func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, error) {
@@ -40,11 +43,23 @@ func loadOrMakeCSR(path string, opts *csrOptions) (*x509.CertificateRequest, err
 		Locality:           subjOrNil(opts.locality),
 		Country:            subjOrNil(opts.country),
 	}
+
+	var ipAddresses []net.IP
+	for _, ipStr := range opts.ipAddresses {
+		if ipStr != "" {
+			ip := net.ParseIP(ipStr)
+			if ip != nil {
+				ipAddresses = append(ipAddresses, ip)
+			}
+		}
+	}
+
 	template := x509util.CertificateRequest{
 		CertificateRequest: x509.CertificateRequest{
 			Subject:            subject,
 			SignatureAlgorithm: x509.SHA256WithRSA,
-			DNSNames:           subjOrNil(opts.dnsName),
+			DNSNames:           opts.dnsNames,
+			IPAddresses:        ipAddresses,
 		},
 	}
 	if opts.challenge != "" {

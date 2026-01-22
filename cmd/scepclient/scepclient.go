@@ -50,7 +50,8 @@ type runCfg struct {
 	debug           bool
 	logfmt          string
 	caCertMsg       string
-	dnsName         string
+	dnsNames        []string
+	ipAddresses     []string
 }
 
 func run(cfg runCfg) error {
@@ -81,15 +82,16 @@ func run(cfg runCfg) error {
 	}
 
 	opts := &csrOptions{
-		cn:        cfg.cn,
-		org:       cfg.org,
-		country:   strings.ToUpper(cfg.country),
-		ou:        cfg.ou,
-		locality:  cfg.locality,
-		province:  cfg.province,
-		challenge: cfg.challenge,
-		key:       key,
-		dnsName:   cfg.dnsName,
+		cn:          cfg.cn,
+		org:         cfg.org,
+		country:     strings.ToUpper(cfg.country),
+		ou:          cfg.ou,
+		locality:    cfg.locality,
+		province:    cfg.province,
+		challenge:   cfg.challenge,
+		key:         key,
+		dnsNames:    cfg.dnsNames,
+		ipAddresses: cfg.ipAddresses,
 	}
 
 	csr, err := loadOrMakeCSR(cfg.csrPath, opts)
@@ -285,7 +287,8 @@ func main() {
 		flProvince          = flag.String("province", "", "province for certificate")
 		flCountry           = flag.String("country", "US", "country code in certificate")
 		flCACertMessage     = flag.String("cacert-message", "", "message sent with GetCACert operation")
-		flDNSName           = flag.String("dnsname", "", "DNS name to be included in the certificate (SAN)")
+		flDNSNames          = flag.String("dnsnames", "", "comma-separated DNS names to be included in the certificate (SAN)")
+		flIPAddresses       = flag.String("ipaddresses", "", "comma-separated IP addresses to be included in the certificate (SAN)")
 
 		// in case of multiple certificate authorities, we need to figure out who the recipient of the encrypted
 		// data is. This can be done using either the CA fingerprint, or based on the key usage encoded in the
@@ -334,6 +337,22 @@ func main() {
 		logfmt = "json"
 	}
 
+	var dnsNames []string
+	if *flDNSNames != "" {
+		dnsNames = strings.Split(*flDNSNames, ",")
+		for i := range dnsNames {
+			dnsNames[i] = strings.TrimSpace(dnsNames[i])
+		}
+	}
+
+	var ipAddresses []string
+	if *flIPAddresses != "" {
+		ipAddresses = strings.Split(*flIPAddresses, ",")
+		for i := range ipAddresses {
+			ipAddresses[i] = strings.TrimSpace(ipAddresses[i])
+		}
+	}
+
 	cfg := runCfg{
 		dir:             dir,
 		csrPath:         csrPath,
@@ -353,7 +372,8 @@ func main() {
 		debug:           *flDebugLogging,
 		logfmt:          logfmt,
 		caCertMsg:       *flCACertMessage,
-		dnsName:         *flDNSName,
+		dnsNames:        dnsNames,
+		ipAddresses:     ipAddresses,
 	}
 
 	if err := run(cfg); err != nil {
