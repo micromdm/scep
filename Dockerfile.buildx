@@ -1,0 +1,26 @@
+FROM --platform=$BUILDPLATFORM golang:1.21 AS builder
+
+WORKDIR /go/app
+
+COPY . .
+
+ARG TARGETOS TARGETARCH
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg \
+    CGO_ENABLED=0 make \
+        scepclient-$TARGETOS-$TARGETARCH \
+        scepserver-$TARGETOS-$TARGETARCH
+
+FROM alpine:3
+
+ARG TARGETOS TARGETARCH
+
+COPY --from=builder /go/app/scepclient-$TARGETOS-$TARGETARCH /usr/bin/scepclient
+COPY --from=builder /go/app/scepserver-$TARGETOS-$TARGETARCH /usr/bin/scepserver
+
+EXPOSE 8080
+
+VOLUME ["/depot"]
+
+ENTRYPOINT ["scepserver"]
