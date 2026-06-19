@@ -135,6 +135,8 @@ Usage of ./scepclient-linux-amd64:
     	country code in certificate (default "US")
   -debug
     	enable debug logging
+  -encryption-algorithm string
+    	PKCS#7 content encryption: des|aes128|aes256|aes128gcm|aes256gcm (default "des")
   -keySize int
     	rsa key size (default 2048)
   -locality string
@@ -161,6 +163,10 @@ To obtain a certificate through Network Device Enrollment Service (NDES), set `-
 This most likely uses the `/certsrv/mscep` path. You will need to add the `-ca-fingerprint` client argument during this request to specify which CA to use.
 
 If you're not sure which SHA-256 hash (for a specific CA) to use, you can use the `-debug` flag to print them out for the CAs returned from the SCEP server.
+
+### PKCS#7 content encryption
+
+Use `-encryption-algorithm` to control the symmetric algorithm used to encrypt the PKCS#7 request envelope. The supported values are `des`, `aes128`, `aes256`, `aes128gcm`, and `aes256gcm`. The client defaults to `des` (single DES-CBC) to preserve the previous behavior. Set `-encryption-algorithm=aes128` (or another AES variant) when targeting modern CAs (for example, AWS Private CA Connector for SCEP) that reject DES with `Unsupported algorithm: 1.3.14.3.2.7`.
 
 ## Docker
 

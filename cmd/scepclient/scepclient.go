@@ -21,6 +21,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"github.com/smallstep/pkcs7"
 	"github.com/smallstep/scep"
 )
 
@@ -298,6 +299,12 @@ func main() {
 
 		flDebugLogging = flag.Bool("debug", false, "enable debug logging")
 		flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
+
+		// PKCS#7 content encryption algorithm for the request envelope. The
+		// default remains single DES-CBC for backward compatibility, but it can be
+		// switched to AES for modern CAs (e.g. AWS Private CA Connector for SCEP)
+		// that reject DES with "Unsupported algorithm: 1.3.14.3.2.7".
+		flEncAlg = flag.String("encryption-algorithm", "des", "PKCS#7 content encryption: des|aes128|aes256|aes128gcm|aes256gcm")
 	)
 
 	flag.Parse()
@@ -306,6 +313,22 @@ func main() {
 	if *flVersion {
 		fmt.Println(version)
 		os.Exit(0)
+	}
+
+	switch strings.ToLower(*flEncAlg) {
+	case "des":
+		pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmDESCBC
+	case "aes128", "aes128cbc", "aes":
+		pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES128CBC
+	case "aes256", "aes256cbc":
+		pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES256CBC
+	case "aes128gcm":
+		pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES128GCM
+	case "aes256gcm":
+		pkcs7.ContentEncryptionAlgorithm = pkcs7.EncryptionAlgorithmAES256GCM
+	default:
+		fmt.Printf("invalid encryption-algorithm %q: use des|aes128|aes256|aes128gcm|aes256gcm\n", *flEncAlg)
+		os.Exit(1)
 	}
 
 	if err := validateFlags(*flPKeyPath, *flServerURL, *flCAFingerprint, *flKeyEnciphermentSelector); err != nil {
