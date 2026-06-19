@@ -11,5 +11,6 @@ require (
 	github.com/gorilla/mux v1.4.0
 	github.com/groob/finalizer v0.0.0-20170707115354-4c2ed49aabda
 	github.com/pkg/errors v0.8.0
+	github.com/smallstep/pkcs7 v0.1.1
 	github.com/smallstep/scep v0.0.0-20241223071629-a37a330173bc
 )
