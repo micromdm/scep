@@ -21,8 +21,29 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"github.com/smallstep/pkcs7"
 	"github.com/smallstep/scep"
 )
+
+// parseEncryptionAlgorithm maps the -encryption-algo flag value to the
+// corresponding smallstep/pkcs7 ContentEncryptionAlgorithm constant.
+// DES-CBC remains the default to preserve this client's existing behavior
+// for servers that only understand it; AES is opt-in via the flag. Some
+// SCEP servers (e.g. AWS Private CA's Connector for SCEP) reject DES-CBC
+// outright with "Unsupported algorithm: 1.3.14.3.2.7" - GetCACaps isn't
+// consulted for this choice today, so it has to be set explicitly.
+func parseEncryptionAlgorithm(name string) (int, error) {
+	switch strings.ToUpper(name) {
+	case "DES-CBC":
+		return pkcs7.EncryptionAlgorithmDESCBC, nil
+	case "AES-128-CBC":
+		return pkcs7.EncryptionAlgorithmAES128CBC, nil
+	case "AES-256-CBC":
+		return pkcs7.EncryptionAlgorithmAES256CBC, nil
+	default:
+		return 0, fmt.Errorf("unsupported -encryption-algo %q (want DES-CBC, AES-128-CBC, or AES-256-CBC)", name)
+	}
+}
 
 // version info
 var (
@@ -298,6 +319,8 @@ func main() {
 
 		flDebugLogging = flag.Bool("debug", false, "enable debug logging")
 		flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
+
+		flEncryptionAlgo = flag.String("encryption-algo", "DES-CBC", "content encryption algorithm for the SCEP PKIOperation request: DES-CBC, AES-128-CBC, or AES-256-CBC")
 	)
 
 	flag.Parse()
@@ -307,6 +330,13 @@ func main() {
 		fmt.Println(version)
 		os.Exit(0)
 	}
+
+	encAlgo, err := parseEncryptionAlgorithm(*flEncryptionAlgo)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	pkcs7.ContentEncryptionAlgorithm = encAlgo
 
 	if err := validateFlags(*flPKeyPath, *flServerURL, *flCAFingerprint, *flKeyEnciphermentSelector); err != nil {
 		fmt.Println(err)
