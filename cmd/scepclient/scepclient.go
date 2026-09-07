@@ -272,6 +272,22 @@ func validateFlags(keyPath, serverURL, caFingerprint string, useKeyEnciphermentS
 	return nil
 }
 
+func resolvePaths(keyPath, certPath, csrPath string) (resolvedCertPath, resolvedCSRPath, selfSignPath string) {
+	dir := filepath.Dir(keyPath)
+	if certPath == "" {
+		resolvedCertPath = filepath.Join(dir, "client.pem")
+	} else {
+		resolvedCertPath = certPath
+	}
+	if csrPath == "" {
+		resolvedCSRPath = filepath.Join(dir, "csr.pem")
+	} else {
+		resolvedCSRPath = csrPath
+	}
+	selfSignPath = filepath.Join(dir, "self.pem")
+	return
+}
+
 func main() {
 	var (
 		flVersion           = flag.Bool("version", false, "prints version information")
@@ -279,6 +295,7 @@ func main() {
 		flChallengePassword = flag.String("challenge", "", "enforce a challenge password")
 		flPKeyPath          = flag.String("private-key", "", "private key path, if there is no key, scepclient will create one")
 		flCertPath          = flag.String("certificate", "", "certificate path, if there is no key, scepclient will create one")
+		flCSRPath           = flag.String("csr", "", "certificate signing request (CSR) path, if there is no CSR, scepclient will create one")
 		flKeySize           = flag.Int("keySize", 2048, "rsa key size")
 		flOrg               = flag.String("organization", "scep-client", "organization for cert")
 		flCName             = flag.String("cn", "scepclient", "common name for certificate")
@@ -327,11 +344,8 @@ func main() {
 	}
 
 	dir := filepath.Dir(*flPKeyPath)
-	csrPath := dir + "/csr.pem"
-	selfSignPath := dir + "/self.pem"
-	if *flCertPath == "" {
-		*flCertPath = dir + "/client.pem"
-	}
+	resolvedCertPath, csrPath, selfSignPath := resolvePaths(*flPKeyPath, *flCertPath, *flCSRPath)
+	*flCertPath = resolvedCertPath
 	var logfmt string
 	if *flLogJSON {
 		logfmt = "json"
