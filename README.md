@@ -135,6 +135,8 @@ Usage of ./scepclient-linux-amd64:
     	country code in certificate (default "US")
   -debug
     	enable debug logging
+  -encryption-algorithm string
+    	pkiMessage envelope encryption: des, aes128, aes192, aes256 (default "des")
   -keySize int
     	rsa key size (default 2048)
   -locality string
@@ -151,6 +153,8 @@ Usage of ./scepclient-linux-amd64:
     	province for certificate
   -server-url string
     	SCEP server url
+  -signature-algorithm string
+    	pkiMessage signature digest: sha1, sha256, sha384, sha512 (default "sha1")
   -version
     	prints version information
 ```
@@ -159,6 +163,8 @@ Note: Make sure to specify the desired endpoint in your `-server-url` value (e.g
 
 To obtain a certificate through Network Device Enrollment Service (NDES), set `-server-url` to a server that provides NDES.
 This most likely uses the `/certsrv/mscep` path. You will need to add the `-ca-fingerprint` client argument during this request to specify which CA to use.
+
+The defaults (`des`, `sha1`) match the upstream client. Prefer an AES cipher and a SHA-2 digest supported by your server (see its `GetCACaps`). Note that `scepserver` itself cannot decrypt `aes192` requests.
 
 If you're not sure which SHA-256 hash (for a specific CA) to use, you can use the `-debug` flag to print them out for the CAs returned from the SCEP server.
 

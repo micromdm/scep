@@ -5,7 +5,9 @@ import (
 	"crypto"
 	_ "crypto/sha256"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/hex"
+	stderrors "errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -21,6 +23,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/pkg/errors"
+	"github.com/smallstep/pkcs7"
 	"github.com/smallstep/scep"
 )
 
@@ -47,6 +50,8 @@ type runCfg struct {
 	challenge       string
 	serverURL       string
 	caCertsSelector scep.CertsSelector
+	encrypt         envelopeEncrypter
+	digest          asn1.ObjectIdentifier
 	debug           bool
 	logfmt          string
 	caCertMsg       string
@@ -168,7 +173,7 @@ func run(cfg runCfg) error {
 		}
 	}
 
-	msg, err := scep.NewCSRRequest(csr, tmpl, scep.WithLogger(logger), scep.WithCertsSelector(cfg.caCertsSelector))
+	msg, err := newCSRRequest(csr, tmpl, cfg.caCertsSelector, cfg.encrypt, cfg.digest, logger)
 	if err != nil {
 		return errors.Wrap(err, "creating csr pkiMessage")
 	}
@@ -179,7 +184,7 @@ func run(cfg runCfg) error {
 		// loop in case we get a PENDING response which requires
 		// a manual approval.
 
-		respBytes, err := client.PKIOperation(ctx, msg.Raw)
+		respBytes, err := client.PKIOperation(ctx, msg)
 		if err != nil {
 			return errors.Wrapf(err, "PKIOperation for %s", msgType)
 		}
@@ -201,11 +206,18 @@ func run(cfg runCfg) error {
 		break // on scep.SUCCESS
 	}
 
-	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err != nil {
+	var respCert *x509.Certificate
+	if err := respMsg.DecryptPKIEnvelope(signerCert, key); err == nil {
+		respCert = respMsg.CertRepMessage.Certificate
+	} else if stderrors.Is(err, pkcs7.ErrUnsupportedAlgorithm) {
+		// e.g. AES-192, which the pkcs7 library cannot decrypt
+		if respCert, err = decryptCertRep(respMsg, signerCert, key); err != nil {
+			return errors.Wrapf(err, "decrypt pkiEnvelope, msgType: %s, status %s", msgType, respMsg.PKIStatus)
+		}
+	} else {
 		return errors.Wrapf(err, "decrypt pkiEnvelope, msgType: %s, status %s", msgType, respMsg.PKIStatus)
 	}
 
-	respCert := respMsg.CertRepMessage.Certificate
 	if err := ioutil.WriteFile(cfg.certPath, pemCert(respCert.Raw), 0666); err != nil {
 		return err
 	}
@@ -296,6 +308,9 @@ func main() {
 		flCAFingerprint           = flag.String("ca-fingerprint", "", "SHA-256 digest of CA certificate for NDES server. Note: Changed from MD5.")
 		flKeyEnciphermentSelector = flag.Bool("key-encipherment-selector", false, "Filter CA certificates by key encipherment usage")
 
+		flEncryptionAlgorithm = flag.String("encryption-algorithm", "des", "pkiMessage envelope encryption: des, aes128, aes192, aes256")
+		flSignatureAlgorithm  = flag.String("signature-algorithm", "sha1", "pkiMessage signature digest: sha1, sha256, sha384, sha512")
+
 		flDebugLogging = flag.Bool("debug", false, "enable debug logging")
 		flLogJSON      = flag.Bool("log-json", false, "use JSON for log output")
 	)
@@ -310,6 +325,17 @@ func main() {
 
 	if err := validateFlags(*flPKeyPath, *flServerURL, *flCAFingerprint, *flKeyEnciphermentSelector); err != nil {
 		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	encrypt, ok := encryptionAlgorithms[*flEncryptionAlgorithm]
+	if !ok {
+		fmt.Printf("invalid encryption-algorithm: %s\n", *flEncryptionAlgorithm)
+		os.Exit(1)
+	}
+	digest, ok := signatureAlgorithms[*flSignatureAlgorithm]
+	if !ok {
+		fmt.Printf("invalid signature-algorithm: %s\n", *flSignatureAlgorithm)
 		os.Exit(1)
 	}
 
@@ -369,6 +395,8 @@ func main() {
 		challenge:       *flChallengePassword,
 		serverURL:       *flServerURL,
 		caCertsSelector: caCertsSelector,
+		encrypt:         encrypt,
+		digest:          digest,
 		debug:           *flDebugLogging,
 		logfmt:          logfmt,
 		caCertMsg:       *flCACertMessage,
